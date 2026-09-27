@@ -32,7 +32,7 @@ function load(): Persisted {
         const migrated: Persisted = {
           equipamentos: (oldData.equipamentos ?? []).map(e => ({
             ...e,
-            status: e.status === 'Desativado' ? 'Desativada' : (e.status === 'Em operação' ? 'Em Operação' : (e.status as any) || 'Em Operação')
+            status: String(e.status) === 'Desativado' ? 'Desativada' : (String(e.status) === 'Em operação' ? 'Em Operação' : e.status || 'Em Operação')
           })),
           prestadores: oldData.prestadores ?? [],
           manutencoes,
@@ -48,7 +48,7 @@ function load(): Persisted {
     return {
       equipamentos: (parsed.equipamentos ?? []).map(e => ({
         ...e,
-        status: (e.status === 'Desativado' || e.status === 'Desativada') ? 'Desativada' : 'Em Operação'
+        status: (String(e.status) === 'Desativado' || e.status === 'Desativada') ? 'Desativada' : 'Em Operação'
       })),
       prestadores: parsed.prestadores ?? [],
       manutencoes: parsed.manutencoes ?? [],

@@ -32,7 +32,7 @@ export function formatTelefone(value: string): string {
 	return d.replace(/^(\d{2})(\d)/, '($1) $2').replace(/(\d{5})(\d)/, '$1-$2');
 }
 
-export const toNumber = (value: string) => {
+export const toNumber = (value: string | number | null | undefined) => {
 	const normalized = (value ?? '').toString().replace(/[^\d,.-]/g, '').replace(/\./g, '').replace(',', '.');
 	const n = Number.parseFloat(normalized);
 	return Number.isFinite(n) ? n : 0;

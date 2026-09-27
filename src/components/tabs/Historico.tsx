@@ -22,7 +22,7 @@ const Info = ({ label, value }: { label: string; value: string }) => (
 export default function Historico({ lojaInicial, equipamentoInicial }: { lojaInicial?: string; equipamentoInicial?: string }) {
   const {
     equipamentos, equipamentosDaLoja, manutencoesDoEquipamento, eventosDoEquipamento,
-    updateEquipamento, removeEquipamento, addManutencao,
+    updateEquipamento, removeEquipamento, addManutencao, addManutencaoEmLote,
     custoEquipamento, custoLoja, contarManutencoes
   } = useAcm();
   const [loja, setLoja] = useState(lojaInicial ?? '');
@@ -189,10 +189,10 @@ export default function Historico({ lojaInicial, equipamentoInicial }: { lojaIni
                     <Pencil size={15} /> Editar cadastro
                   </Button>
                 )}
-                <Button variant="outline" onClick={() => { setTipoNova('corretiva'); setNovaManutencao(manutencaoVazia(equipamento.id, 'corretiva')); }}>
+                <Button variant="outline" onClick={() => { setTipoNova('corretiva'); setNovaManutencao({ ...manutencaoVazia(equipamento.id, 'corretiva'), lojaCnpj: equipamento.lojaCnpj, equipamentoIds: [equipamento.id] }); }}>
                   <Wrench size={15} /> Corretiva
                 </Button>
-                <Button variant="outline" onClick={() => { setTipoNova('preventiva'); setNovaManutencao(manutencaoVazia(equipamento.id, 'preventiva')); }}>
+                <Button variant="outline" onClick={() => { setTipoNova('preventiva'); setNovaManutencao({ ...manutencaoVazia(equipamento.id, 'preventiva'), lojaCnpj: equipamento.lojaCnpj, equipamentoIds: [equipamento.id] }); }}>
                   <Shield size={15} /> Preventiva
                 </Button>
               </div>
@@ -274,7 +274,19 @@ export default function Historico({ lojaInicial, equipamentoInicial }: { lojaIni
                 <div data-ev-id="ev_43885da1d1" className="flex flex-row flex-wrap gap-2">
                   <Button
                     onClick={() => {
-                      addManutencao({ ...novaManutencao, equipamentoId: equipamento.id });
+                      const {
+                        lojaCnpj: _lojaCnpj,
+                        equipamentoIds: idsSelecionados,
+                        equipamentoId: _equipamentoId,
+                        ...dadosManutencao
+                      } = novaManutencao;
+                      const ids = idsSelecionados?.length ? idsSelecionados : [equipamento.id];
+
+                      if (ids.length > 1) {
+                        addManutencaoEmLote(ids, dadosManutencao);
+                      } else {
+                        addManutencao({ ...dadosManutencao, equipamentoId: ids[0] });
+                      }
                       setNovaManutencao(null);
                     }}
                   >

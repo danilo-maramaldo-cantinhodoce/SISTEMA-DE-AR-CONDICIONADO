@@ -16,8 +16,8 @@ import {
 } from 'lucide-react';
 import { Badge, Button, Card, CardHeader, EmptyState } from '@/components/ui';
 import { useAcm } from '@/hooks/use-acm';
-import { LOJAS_LISTA, lojaNome } from '@/lib/constants';
-import type { EquipamentoDraft, StatusEquipamento, TipoEquipamento, Voltagem } from '@/lib/drafts';
+import { LOJAS, lojaNome } from '@/lib/constants';
+import type { EquipamentoDraft } from '@/lib/drafts';
 
 interface LinhaImportacao {
   idTemp: string;
@@ -55,7 +55,7 @@ export default function ImportacaoDados() {
     ];
 
     const exemplo1 = [
-      LOJAS_LISTA[0]?.cnpj || '00000000000000',
+      LOJAS[0]?.cnpj || '00000000000000',
       'AC-01',
       'Atendimento / Caixa',
       'Elgin',
@@ -72,7 +72,7 @@ export default function ImportacaoDados() {
     ];
 
     const exemplo2 = [
-      LOJAS_LISTA[1]?.cnpj || '11111111111111',
+      LOJAS[1]?.cnpj || '11111111111111',
       'AC-02',
       'Depósito',
       'Midea',
@@ -117,9 +117,11 @@ export default function ImportacaoDados() {
     if (!tag) erros.push('TAG do equipamento é obrigatória.');
     if (!local) erros.push('Localização é obrigatória.');
 
-    const statusValidos: StatusEquipamento[] = ['Ativo', 'Inativo', 'Em Manutenção', 'Descartado'];
-    const statusInformado = (dado.status || 'Ativo').trim() as StatusEquipamento;
-    const status: StatusEquipamento = statusValidos.includes(statusInformado) ? statusInformado : 'Ativo';
+    const statusInformado = (dado.status || 'Em Operação').trim().toLowerCase();
+    const status: EquipamentoDraft['status'] =
+      ['desativada', 'desativado', 'inativo', 'descartado'].includes(statusInformado)
+        ? 'Desativada'
+        : 'Em Operação';
 
     const draft: EquipamentoDraft = {
       lojaCnpj,
@@ -127,11 +129,11 @@ export default function ImportacaoDados() {
       local,
       marca,
       potencia,
-      tipoEquipamento: (dado.tipoEquipamento || dado.tipo || '') as TipoEquipamento,
+      tipoEquipamento: dado.tipoEquipamento || dado.tipo || '',
       modelo: dado.modelo || '',
       numeroSerie: dado.numeroSerie || dado.serie || '',
       patrimonio: dado.patrimonio || '',
-      voltagem: (dado.voltagem || '220V') as Voltagem,
+      voltagem: dado.voltagem || '220V',
       gasRefrigerante: dado.gasRefrigerante || dado.gas || '',
       dataInstalacao: dado.dataInstalacao || '',
       status,

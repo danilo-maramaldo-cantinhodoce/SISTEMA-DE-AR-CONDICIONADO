@@ -3,7 +3,11 @@ import type { Equipamento, Manutencao, ServicoItem, TipoManutencao } from '@/lib
 
 export type EquipamentoDraft = Omit<Equipamento, 'id' | 'criadoEm' | 'atualizadoEm'>;
 
-export type ManutencaoDraft = Omit<Manutencao, 'id' | 'criadoEm' | 'atualizadoEm'>;
+export type ManutencaoDraft = Omit<Manutencao, 'id' | 'criadoEm' | 'atualizadoEm'> & {
+	/** Campos temporários usados apenas pelo formulário de manutenção. */
+	lojaCnpj?: string;
+	equipamentoIds?: string[];
+};
 
 export const draftVazio = (): EquipamentoDraft => ({
 	lojaCnpj: '',
@@ -18,7 +22,7 @@ export const draftVazio = (): EquipamentoDraft => ({
 	gasRefrigerante: '',
 	dataInstalacao: '',
 	patrimonio: '',
-	status: 'Em operação',
+	status: 'Em Operação',
 	observacoes: '',
 });
 

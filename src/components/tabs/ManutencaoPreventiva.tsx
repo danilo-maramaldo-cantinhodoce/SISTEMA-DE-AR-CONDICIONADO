@@ -159,28 +159,28 @@ export default function ManutencaoPreventiva({ lojaInicial }: { lojaInicial?: st
               action={
                 <div className="flex flex-row items-center gap-1.5 bg-muted p-1 rounded-lg">
                   <Button
-                    variant={filtroStatus === 'todos' ? 'default' : 'ghost'}
+                    variant={filtroStatus === 'todos' ? 'primary' : 'ghost'}
                     className="text-xs h-8 px-2.5"
                     onClick={() => setFiltroStatus('todos')}
                   >
                     Todos ({listaEquipamentos.length})
                   </Button>
                   <Button
-                    variant={filtroStatus === 'atrasados' ? 'default' : 'ghost'}
+                    variant={filtroStatus === 'atrasados' ? 'primary' : 'ghost'}
                     className="text-xs h-8 px-2.5 text-red-600"
                     onClick={() => setFiltroStatus('atrasados')}
                   >
                     Atrasadas ({totalAtrasados})
                   </Button>
                   <Button
-                    variant={filtroStatus === 'proximos' ? 'default' : 'ghost'}
+                    variant={filtroStatus === 'proximos' ? 'primary' : 'ghost'}
                     className="text-xs h-8 px-2.5 text-amber-600"
                     onClick={() => setFiltroStatus('proximos')}
                   >
                     Próximas ({totalProximos})
                   </Button>
                   <Button
-                    variant={filtroStatus === 'em_dia' ? 'default' : 'ghost'}
+                    variant={filtroStatus === 'em_dia' ? 'primary' : 'ghost'}
                     className="text-xs h-8 px-2.5 text-green-600"
                     onClick={() => setFiltroStatus('em_dia')}
                   >
