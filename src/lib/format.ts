@@ -32,7 +32,7 @@ export function formatTelefone(value: string): string {
 	return d.replace(/^(\d{2})(\d)/, '($1) $2').replace(/(\d{5})(\d)/, '$1-$2');
 }
 
-export const toNumber = (value: string | number | null | undefined) => {
+export const toNumber = (value: string) => {
 	const normalized = (value ?? '').toString().replace(/[^\d,.-]/g, '').replace(/\./g, '').replace(',', '.');
 	const n = Number.parseFloat(normalized);
 	return Number.isFinite(n) ? n : 0;
@@ -57,3 +57,41 @@ export function formatDataHora(iso: string): string {
 export const hoje = () => new Date().toISOString().slice(0, 10);
 
 export const novoId = () => `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`;
+
+/** Dispara o download de um arquivo de texto (usado para o modelo CSV de importação). */
+export function downloadTextFile(filename: string, content: string, mime = 'text/csv;charset=utf-8;') {
+	const blob = new Blob([content], { type: mime });
+	const url = URL.createObjectURL(blob);
+	const a = document.createElement('a');
+	a.href = url;
+	a.download = filename;
+	document.body.appendChild(a);
+	a.click();
+	a.remove();
+	URL.revokeObjectURL(url);
+}
+
+/** Parser simples de CSV (separador vírgula, campos entre aspas suportados). Não trata quebras de linha dentro de campos. */
+export function parseCsv(text: string): string[][] {
+	return text
+		.split(/\r?\n/)
+		.filter((line) => line.trim().length > 0)
+		.map((line) => {
+			const cells: string[] = [];
+			let atual = '';
+			let dentroAspas = false;
+			for (let i = 0; i < line.length; i++) {
+				const c = line[i];
+				if (c === '"') {
+					dentroAspas = !dentroAspas;
+				} else if (c === ',' && !dentroAspas) {
+					cells.push(atual.trim());
+					atual = '';
+				} else {
+					atual += c;
+				}
+			}
+			cells.push(atual.trim());
+			return cells;
+		});
+}

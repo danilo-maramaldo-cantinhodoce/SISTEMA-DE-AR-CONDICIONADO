@@ -1,446 +1,228 @@
-import { useState, useRef, ChangeEvent, DragEvent } from 'react';
-import {
-  FileSpreadsheet,
-  Upload,
-  Download,
-  CheckCircle2,
-  AlertTriangle,
-  FileText,
-  X,
-  RefreshCw,
-  Table,
-  Trash2,
-  HelpCircle,
-  Check,
-  Building2
-} from 'lucide-react';
-import { Badge, Button, Card, CardHeader, EmptyState } from '@/components/ui';
+import { useRef, useState } from 'react';
+import { AlertTriangle, CheckCircle2, Download, Upload, UploadCloud } from 'lucide-react';
+import { Badge, Button, Card, CardHeader } from '@/components/ui';
 import { useAcm } from '@/hooks/use-acm';
-import { LOJAS, lojaNome } from '@/lib/constants';
-import type { EquipamentoDraft } from '@/lib/drafts';
+import { LOJAS } from '@/lib/constants';
+import { downloadTextFile, hoje, novoId, parseCsv } from '@/lib/format';
+import type { Equipamento, StatusEquipamento, StatusManutencao, TipoManutencao, PeriodicidadePreventiva, TipoNota } from '@/lib/types';
 
-interface LinhaImportacao {
-  idTemp: string;
-  draft: EquipamentoDraft;
-  erros: string[];
-  valido: boolean;
+const CABECALHO = [
+  'tipo_registro', 'loja', 'tag', 'local', 'marca', 'potencia', 'tipo_equipamento', 'modelo',
+  'numero_serie', 'voltagem', 'gas_refrigerante', 'data_instalacao', 'data_desativacao', 'vida_util',
+  'patrimonio', 'status', 'observacoes_equipamento',
+  'manutencao_tipo', 'periodicidade_preventiva', 'manutencao_data', 'manutencao_status',
+  'prestador', 'nota_numero', 'nota_tipo', 'nota_valor', 'valor_individual',
+  'problema_atestado', 'solucao', 'observacoes_manutencao',
+];
+
+const LINHA_EXEMPLO_EQUIPAMENTO = [
+  'equipamento', 'Cohama', 'EQ. 01', 'Sala do gerente', 'LG', '12000 BTUs', 'Split Hi-Wall', 'Dual Inverter',
+  '812TAQK3F210', '220V', 'R-410A', '2022-03-15', '', '', '004512', 'Em operação', '',
+  '', '', '', '', '', '', '', '', '', '', '', '',
+];
+
+const LINHA_EXEMPLO_MANUTENCAO = [
+  'manutencao', 'Cohama', 'EQ. 01', '', '', '', '', '',
+  '', '', '', '', '', '', '', '', '',
+  'preventiva', 'Trimestral', '2026-06-10', 'Concluída',
+  'Refrigera Ar Ltda', '000123', 'DANFE', '250', '250',
+  '', 'Higienização e troca de filtros', '',
+];
+
+function baixarModelo() {
+  const linhas = [CABECALHO, LINHA_EXEMPLO_EQUIPAMENTO, LINHA_EXEMPLO_MANUTENCAO];
+  const csv = linhas.map((l) => l.map((v) => (v.includes(',') ? `"${v}"` : v)).join(',')).join('\n');
+  downloadTextFile('modelo-importacao-ar-condicionado.csv', csv);
+}
+
+function cnpjPorNomeLoja(nome: string): string | null {
+  const alvo = nome.trim().toLowerCase();
+  return LOJAS.find((l) => l.nome.trim().toLowerCase() === alvo)?.cnpj ?? null;
 }
 
 export default function ImportacaoDados() {
-  const { addEquipamento } = useAcm();
-  const fileInputRef = useRef<HTMLInputElement>(null);
+  const { equipamentos, addEquipamento, prestadores, addPrestador, addManutencao } = useAcm();
+  const inputRef = useRef<HTMLInputElement>(null);
+  const [processando, setProcessando] = useState(false);
+  const [resumo, setResumo] = useState<{ equipamentos: number; manutencoes: number; erros: string[] } | null>(null);
 
-  const [linhas, setLinhas] = useState<LinhaImportacao[]>([]);
-  const [nomeArquivo, setNomeArquivo] = useState<string>('');
-  const [isDragging, setIsDragging] = useState(false);
-  const [importadoSucesso, setImportadoSucesso] = useState<number | null>(null);
-
-  // 1. Download do Modelo CSV
-  const baixarModeloCSV = () => {
-    const cabecalhos = [
-      'lojaCnpj',
-      'tag',
-      'local',
-      'marca',
-      'potencia',
-      'tipoEquipamento',
-      'modelo',
-      'numeroSerie',
-      'patrimonio',
-      'voltagem',
-      'gasRefrigerante',
-      'dataInstalacao',
-      'status',
-      'observacoes'
-    ];
-
-    const exemplo1 = [
-      LOJAS[0]?.cnpj || '00000000000000',
-      'AC-01',
-      'Atendimento / Caixa',
-      'Elgin',
-      '18000 BTU',
-      'Hi-Wall',
-      'Eco Logic',
-      'SN123456789',
-      'PAT-9988',
-      '220V',
-      'R-410A',
-      '2024-01-15',
-      'Ativo',
-      'Equipamento em bom estado'
-    ];
-
-    const exemplo2 = [
-      LOJAS[1]?.cnpj || '11111111111111',
-      'AC-02',
-      'Depósito',
-      'Midea',
-      '36000 BTU',
-      'Piso Teto',
-      'Liva',
-      'SN987654321',
-      'PAT-9989',
-      '220V',
-      'R-32',
-      '2023-08-10',
-      'Ativo',
-      'Manutenção preventiva em dia'
-    ];
-
-    const conteudoCSV =
-      '\uFEFF' + // UTF-8 BOM para abrir corretamente no Excel
-      [cabecalhos.join(';'), exemplo1.join(';'), exemplo2.join(';')].join('\n');
-
-    const blob = new Blob([conteudoCSV], { type: 'text/csv;charset=utf-8;' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = 'modelo_importacao_equipamentos.csv';
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
-    URL.revokeObjectURL(url);
-  };
-
-  // 2. Processamento e Validação do CSV/JSON
-  const validarEConverterLinha = (dado: Record<string, string>, index: number): LinhaImportacao => {
+  const processarArquivo = async (file: File) => {
+    setProcessando(true);
     const erros: string[] = [];
+    let totalEquip = 0;
+    let totalMan = 0;
 
-    const lojaCnpj = (dado.lojaCnpj || dado.cnpj || '').trim();
-    const tag = (dado.tag || dado.TAG || '').trim();
-    const local = (dado.local || dado.Local || '').trim();
-    const marca = (dado.marca || dado.Marca || '').trim();
-    const potencia = (dado.potencia || dado.Potencia || dado.potência || '').trim();
+    try {
+      const texto = await file.text();
+      const linhas = parseCsv(texto);
+      if (linhas.length < 2) {
+        setResumo({ equipamentos: 0, manutencoes: 0, erros: ['Arquivo vazio ou sem linhas de dados.'] });
+        setProcessando(false);
+        return;
+      }
 
-    if (!lojaCnpj) erros.push('CNPJ da Loja é obrigatório.');
-    if (!tag) erros.push('TAG do equipamento é obrigatória.');
-    if (!local) erros.push('Localização é obrigatória.');
+      const header = linhas[0].map((h) => h.trim().toLowerCase());
+      const idx = (nome: string) => header.indexOf(nome);
+      const col = (linha: string[], nome: string) => (idx(nome) >= 0 ? (linha[idx(nome)] ?? '').trim() : '');
 
-    const statusInformado = (dado.status || 'Em Operação').trim().toLowerCase();
-    const status: EquipamentoDraft['status'] =
-      ['desativada', 'desativado', 'inativo', 'descartado'].includes(statusInformado)
-        ? 'Desativada'
-        : 'Em Operação';
+      // Mapa local tag+loja -> equipamentoId, começando com os já existentes
+      const chave = (loja: string, tag: string) => `${loja}::${tag.trim().toLowerCase()}`;
+      const mapaEquip = new Map<string, string>();
+      (equipamentos ?? []).forEach((eq) => mapaEquip.set(chave(eq.lojaCnpj, eq.tag), eq.id));
 
-    const draft: EquipamentoDraft = {
-      lojaCnpj,
-      tag,
-      local,
-      marca,
-      potencia,
-      tipoEquipamento: dado.tipoEquipamento || dado.tipo || '',
-      modelo: dado.modelo || '',
-      numeroSerie: dado.numeroSerie || dado.serie || '',
-      patrimonio: dado.patrimonio || '',
-      voltagem: dado.voltagem || '220V',
-      gasRefrigerante: dado.gasRefrigerante || dado.gas || '',
-      dataInstalacao: dado.dataInstalacao || '',
-      status,
-      observacoes: dado.observacoes || ''
-    };
+      const linhasEquip = linhas.slice(1).filter((l) => col(l, 'tipo_registro').toLowerCase() === 'equipamento');
+      const linhasMan = linhas.slice(1).filter((l) => col(l, 'tipo_registro').toLowerCase() === 'manutencao');
 
-    return {
-      idTemp: `row-${index}-${Date.now()}`,
-      draft,
-      erros,
-      valido: erros.length === 0
-    };
-  };
+      // Passo 1: equipamentos
+      linhasEquip.forEach((linha, i) => {
+        const lojaNomeCsv = col(linha, 'loja');
+        const cnpj = cnpjPorNomeLoja(lojaNomeCsv);
+        const tag = col(linha, 'tag');
+        if (!cnpj) return erros.push(`Linha equipamento ${i + 2}: loja "${lojaNomeCsv}" não encontrada.`);
+        if (!tag) return erros.push(`Linha equipamento ${i + 2}: tag não informada.`);
 
-  const processarTextoCSV = (texto: string) => {
-    const linhasTexto = texto.split(/\r\n|\n/).filter((l) => l.trim().length > 0);
-    if (linhasTexto.length < 2) {
-      alert('O arquivo selecionado está vazio ou não possui cabeçalhos válidos.');
-      return;
-    }
+        const statusCsv = col(linha, 'status');
+        const status: StatusEquipamento = statusCsv === 'Desativada' ? 'Desativada' : 'Em operação';
 
-    // Detecta separador (; ou ,)
-    const primeiraLinha = linhasTexto[0];
-    const separador = primeiraLinha.includes(';') ? ';' : ',';
+        const novo: Omit<Equipamento, 'id' | 'criadoEm' | 'atualizadoEm'> = {
+          lojaCnpj: cnpj,
+          tag,
+          local: col(linha, 'local'),
+          marca: col(linha, 'marca'),
+          potencia: col(linha, 'potencia'),
+          tipoEquipamento: col(linha, 'tipo_equipamento'),
+          modelo: col(linha, 'modelo'),
+          numeroSerie: col(linha, 'numero_serie'),
+          voltagem: col(linha, 'voltagem'),
+          gasRefrigerante: col(linha, 'gas_refrigerante'),
+          dataInstalacao: col(linha, 'data_instalacao'),
+          dataDesativacao: col(linha, 'data_desativacao'),
+          vidaUtil: col(linha, 'vida_util'),
+          patrimonio: col(linha, 'patrimonio'),
+          status,
+          observacoes: col(linha, 'observacoes_equipamento'),
+        };
 
-    const cabecalhos = primeiraLinha.split(separador).map((c) => c.trim().replace(/^"|"$/g, ''));
-
-    const resultado: LinhaImportacao[] = [];
-
-    for (let i = 1; i < linhasTexto.length; i++) {
-      const valores = linhasTexto[i].split(separador).map((v) => v.trim().replace(/^"|"$/g, ''));
-      if (valores.length <= 1 && !valores[0]) continue;
-
-      const objetoLinha: Record<string, string> = {};
-      cabecalhos.forEach((col, idx) => {
-        objetoLinha[col] = valores[idx] || '';
+        const criado = addEquipamento(novo);
+        mapaEquip.set(chave(cnpj, tag), criado.id);
+        totalEquip++;
       });
 
-      resultado.push(validarEConverterLinha(objetoLinha, i));
-    }
+      // Passo 2: manutenções (referenciando equipamentos já existentes ou recém-criados)
+      linhasMan.forEach((linha, i) => {
+        const lojaNomeCsv = col(linha, 'loja');
+        const cnpj = cnpjPorNomeLoja(lojaNomeCsv);
+        const tag = col(linha, 'tag');
+        if (!cnpj) return erros.push(`Linha manutenção ${i + 2}: loja "${lojaNomeCsv}" não encontrada.`);
 
-    setLinhas(resultado);
-    setImportadoSucesso(null);
-  };
+        const equipamentoId = mapaEquip.get(chave(cnpj, tag));
+        if (!equipamentoId) return erros.push(`Linha manutenção ${i + 2}: equipamento "${tag}" não encontrado em ${lojaNomeCsv}.`);
 
-  const processarArquivo = (file: File) => {
-    setNomeArquivo(file.name);
-    const reader = new FileReader();
+        const tipoCsv = col(linha, 'manutencao_tipo').toLowerCase();
+        const tipo: TipoManutencao = tipoCsv === 'preventiva' ? 'preventiva' : 'corretiva';
+        const periodicidadeCsv = col(linha, 'periodicidade_preventiva');
+        const periodicidadePreventiva: PeriodicidadePreventiva | undefined =
+          tipo === 'preventiva' ? (periodicidadeCsv === 'Semestral' ? 'Semestral' : 'Trimestral') : undefined;
 
-    if (file.name.endsWith('.json')) {
-      reader.onload = (e) => {
-        try {
-          const json = JSON.parse(e.target?.result as string);
-          if (Array.isArray(json)) {
-            const parsed = json.map((obj, idx) => validarEConverterLinha(obj, idx));
-            setLinhas(parsed);
-            setImportadoSucesso(null);
+        const nomePrestador = col(linha, 'prestador');
+        let prestadorId = '';
+        if (nomePrestador) {
+          const existente = prestadores.find((p) => p.nome.trim().toLowerCase() === nomePrestador.trim().toLowerCase());
+          if (existente) {
+            prestadorId = existente.id;
           } else {
-            alert('O JSON deve conter um array de objetos de equipamentos.');
+            const novoPrestador = addPrestador({
+              nome: nomePrestador, razaoSocial: '', documento: '', tipoDocumento: '', contato: '', email: '', observacoes: '',
+            });
+            prestadorId = novoPrestador.id;
           }
-        } catch {
-          alert('Erro ao ler arquivo JSON. Verifique a formatação.');
         }
-      };
-      reader.readAsText(file);
-    } else {
-      // Trata CSV / TXT
-      reader.onload = (e) => {
-        const conteudo = e.target?.result as string;
-        processarTextoCSV(conteudo);
-      };
-      reader.readAsText(file, 'UTF-8');
+
+        const notaTipoCsv = col(linha, 'nota_tipo');
+        const notaTipo: TipoNota | '' = notaTipoCsv === 'DANFE' || notaTipoCsv === 'NFSE' ? notaTipoCsv : '';
+        const statusManCsv = col(linha, 'manutencao_status');
+        const statusManutencao: StatusManutencao = (['Aberta', 'Em andamento', 'Concluída'] as StatusManutencao[]).includes(statusManCsv as StatusManutencao)
+          ? (statusManCsv as StatusManutencao)
+          : 'Concluída';
+
+        addManutencao({
+          equipamentoId,
+          tipo,
+          periodicidadePreventiva,
+          data: col(linha, 'manutencao_data') || hoje(),
+          problemaAtestado: col(linha, 'problema_atestado'),
+          solucao: col(linha, 'solucao'),
+          status: statusManutencao,
+          observacoes: col(linha, 'observacoes_manutencao'),
+          servicos: [{
+            id: novoId(),
+            prestadorId,
+            descricao: col(linha, 'solucao'),
+            notaNumero: col(linha, 'nota_numero'),
+            notaTipo,
+            notaValor: col(linha, 'nota_valor'),
+            notaData: col(linha, 'manutencao_data') || hoje(),
+            valorIndividual: col(linha, 'valor_individual'),
+          }],
+        });
+        totalMan++;
+      });
+    } catch {
+      erros.push('Não foi possível ler o arquivo. Verifique se é um CSV válido.');
     }
+
+    setResumo({ equipamentos: totalEquip, manutencoes: totalMan, erros });
+    setProcessando(false);
   };
-
-  const handleFileChange = (e: ChangeEvent<HTMLInputElement>) => {
-    const files = e.target.files;
-    if (files && files.length > 0) {
-      processarArquivo(files[0]);
-    }
-  };
-
-  const handleDragOver = (e: DragEvent<HTMLDivElement>) => {
-    e.preventDefault();
-    setIsDragging(true);
-  };
-
-  const handleDragLeave = () => {
-    setIsDragging(false);
-  };
-
-  const handleDrop = (e: DragEvent<HTMLDivElement>) => {
-    e.preventDefault();
-    setIsDragging(false);
-    if (e.dataTransfer.files && e.dataTransfer.files.length > 0) {
-      processarArquivo(e.dataTransfer.files[0]);
-    }
-  };
-
-  const removerLinha = (idTemp: string) => {
-    setLinhas((prev) => prev.filter((l) => l.idTemp !== idTemp));
-  };
-
-  // 3. Execução da Importação em Lote
-  const confirmarImportacao = () => {
-    const validos = linhas.filter((l) => l.valido);
-    if (validos.length === 0) return;
-
-    validos.forEach((item) => {
-      addEquipamento(item.draft);
-    });
-
-    setImportadoSucesso(validos.length);
-    setLinhas([]);
-    setNomeArquivo('');
-    if (fileInputRef.current) fileInputRef.current.value = '';
-  };
-
-  const totalValidos = linhas.filter((l) => l.valido).length;
-  const totalErros = linhas.filter((l) => !l.valido).length;
 
   return (
     <div className="flex flex-col gap-5">
-      {/* Informações e Modelo */}
       <Card>
         <CardHeader
-          icon={<FileSpreadsheet className="text-emerald-600" size={18} />}
-          title="Importação em Lote de Equipamentos"
-          subtitle="Cadastre múltiplos ar-condicionados de uma só vez utilizando uma planilha de modelo padrão (CSV)."
-          action={
-            <Button variant="outline" className="text-xs gap-2 border-emerald-200 text-emerald-800 hover:bg-emerald-50" onClick={baixarModeloCSV}>
-              <Download size={14} /> Baixar Planilha Modelo (CSV)
+          icon={<UploadCloud size={18} />}
+          title="Importação de Dados"
+          subtitle="Use uma única planilha (CSV) para carregar equipamentos e o histórico de manutenções de uma vez." />
+
+        <div className="flex flex-col gap-5 p-5">
+          <div className="flex flex-col gap-2 rounded-lg bg-blue-50 border border-blue-200 px-4 py-3 text-sm text-blue-900">
+            <p><strong>Como funciona:</strong> baixe o modelo, preencha uma linha por equipamento (tipo_registro = "equipamento") e uma linha por manutenção (tipo_registro = "manutencao"), depois envie o arquivo. Máquinas são associadas pela combinação Loja + Tag.</p>
+          </div>
+
+          <div className="flex flex-row flex-wrap gap-3">
+            <Button variant="outline" onClick={baixarModelo}>
+              <Download size={16} /> Baixar modelo CSV
             </Button>
-          }
-        />
-        <div className="p-5">
-          <div className="flex flex-col md:flex-row items-start gap-4 rounded-xl bg-emerald-50/60 p-4 border border-emerald-100 text-xs text-emerald-900">
-            <HelpCircle size={20} className="text-emerald-600 shrink-0 mt-0.5" />
-            <div className="flex flex-col gap-1">
-              <span className="font-bold text-sm">Instruções para Importação:</span>
-              <p>
-                1. Faça o download do arquivo modelo clicando no botão acima.<br />
-                2. Preencha os dados no Excel ou Google Sheets mantendo os nomes das colunas intactos.<br />
-                3. Certifique-se de preencher os campos obrigatórios: <strong>lojaCnpj</strong>, <strong>tag</strong> e <strong>local</strong>.<br />
-                4. Salve como <strong>CSV (separado por ponto e vírgula ou vírgula)</strong> e faça o upload na área abaixo.
-              </p>
+            <Button onClick={() => inputRef.current?.click()} disabled={processando}>
+              <Upload size={16} /> {processando ? 'Importando…' : 'Selecionar arquivo CSV'}
+            </Button>
+            <input
+              ref={inputRef}
+              type="file"
+              accept=".csv"
+              className="hidden"
+              onChange={(e) => {
+                const file = e.target.files?.[0];
+                if (file) processarArquivo(file);
+                e.target.value = '';
+              }} />
+          </div>
+
+          {resumo &&
+          <div className="flex flex-col gap-3 rounded-lg border border-border p-4">
+            <div className="flex flex-row flex-wrap gap-2">
+              <Badge tone="green"><CheckCircle2 size={12} /> {resumo.equipamentos} equipamento(s) importado(s)</Badge>
+              <Badge tone="green"><CheckCircle2 size={12} /> {resumo.manutencoes} manutenção(ões) importada(s)</Badge>
+              {resumo.erros.length > 0 && <Badge tone="red"><AlertTriangle size={12} /> {resumo.erros.length} erro(s)</Badge>}
             </div>
-          </div>
-        </div>
-      </Card>
-
-      {/* Alerta de Sucesso após Importar */}
-      {importadoSucesso !== null && (
-        <div className="flex flex-row items-center justify-between gap-3 rounded-xl bg-green-50 p-4 border border-green-200 text-green-900">
-          <div className="flex flex-row items-center gap-3">
-            <CheckCircle2 size={24} className="text-green-600" />
-            <div className="flex flex-col">
-              <span className="font-bold text-sm">Importação Concluída com Sucesso!</span>
-              <span className="text-xs text-green-700">
-                {importadoSucesso} equipamento(s) foram adicionados ao sistema.
-              </span>
-            </div>
-          </div>
-          <Button variant="ghost" className="h-8 w-8 p-0 text-green-700" onClick={() => setImportadoSucesso(null)}>
-            <X size={16} />
-          </Button>
-        </div>
-      )}
-
-      {/* Zona de Upload */}
-      <Card>
-        <div
-          onDragOver={handleDragOver}
-          onDragLeave={handleDragLeave}
-          onDrop={handleDrop}
-          onClick={() => fileInputRef.current?.click()}
-          className={`flex flex-col items-center justify-center gap-3 p-8 border-2 border-dashed rounded-xl cursor-pointer transition m-5 ${
-            isDragging ? 'border-primary bg-primary/10' : 'border-border bg-muted/20 hover:bg-muted/50'
-          }`}
-        >
-          <input
-            type="file"
-            ref={fileInputRef}
-            onChange={handleFileChange}
-            accept=".csv, .json, text/plain"
-            className="hidden"
-          />
-          <div className="flex h-12 w-12 items-center justify-center rounded-full bg-primary/10 text-primary">
-            <Upload size={24} />
-          </div>
-          <div className="flex flex-col items-center text-center gap-1">
-            <span className="text-sm font-bold text-gray-900">
-              {nomeArquivo ? `Arquivo selecionado: ${nomeArquivo}` : 'Arraste seu arquivo CSV ou clique para selecionar'}
-            </span>
-            <span className="text-xs text-muted-foreground">
-              Suporta arquivos .CSV e .JSON formatados
-            </span>
-          </div>
-        </div>
-      </Card>
-
-      {/* Pré-visualização dos Dados Carregados */}
-      {linhas.length > 0 && (
-        <Card>
-          <CardHeader
-            icon={<Table size={18} />}
-            title="Pré-visualização e Validação"
-            subtitle="Revise os itens importados antes de salvar no sistema."
-            action={
-              <div className="flex flex-row items-center gap-2">
-                <Button
-                  variant="outline"
-                  className="text-xs text-red-600"
-                  onClick={() => {
-                    setLinhas([]);
-                    setNomeArquivo('');
-                  }}
-                >
-                  <RefreshCw size={13} className="mr-1" /> Limpar
-                </Button>
-                <Button
-                  disabled={totalValidos === 0}
-                  onClick={confirmarImportacao}
-                  className="text-xs gap-1.5"
-                >
-                  <Check size={15} /> Confirmar Importação ({totalValidos})
-                </Button>
-              </div>
+            {resumo.erros.length > 0 &&
+            <ul className="list-disc pl-5 text-xs text-red-700">
+              {resumo.erros.map((e, i) => <li key={i}>{e}</li>)}
+            </ul>
             }
-          />
-
-          <div className="flex flex-col gap-4 p-5">
-            {/* Resumo da Validação */}
-            <div className="grid grid-cols-2 gap-3 md:grid-cols-3">
-              <div className="flex flex-col items-center rounded-lg bg-blue-50 p-3 text-blue-900 border border-blue-100">
-                <span className="text-lg font-bold">{linhas.length}</span>
-                <span className="text-xs">Linhas Lido</span>
-              </div>
-              <div className="flex flex-col items-center rounded-lg bg-green-50 p-3 text-green-900 border border-green-100">
-                <span className="text-lg font-bold">{totalValidos}</span>
-                <span className="text-xs">Prontos para Importar</span>
-              </div>
-              <div className="flex flex-col items-center rounded-lg bg-red-50 p-3 text-red-900 border border-red-100">
-                <span className="text-lg font-bold">{totalErros}</span>
-                <span className="text-xs">Com Inconsistências</span>
-              </div>
-            </div>
-
-            {/* Tabela de Registros */}
-            <div className="overflow-x-auto rounded-lg border border-border">
-              <table className="w-full text-left text-xs">
-                <thead className="bg-muted text-muted-foreground font-semibold">
-                  <tr>
-                    <th className="p-3">Status</th>
-                    <th className="p-3">Loja (CNPJ)</th>
-                    <th className="p-3">TAG</th>
-                    <th className="p-3">Local</th>
-                    <th className="p-3">Marca / Potência</th>
-                    <th className="p-3">Tipo / Modelo</th>
-                    <th className="p-3">Ação</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-border bg-white">
-                  {linhas.map((item) => (
-                    <tr key={item.idTemp} className={!item.valido ? 'bg-red-50/50' : 'hover:bg-muted/30'}>
-                      <td className="p-3">
-                        {item.valido ? (
-                          <Badge tone="green">
-                            <CheckCircle2 size={11} className="mr-1" /> Válido
-                          </Badge>
-                        ) : (
-                          <Badge tone="red">
-                            <AlertTriangle size={11} className="mr-1" /> Incompleto
-                          </Badge>
-                        )}
-                      </td>
-                      <td className="p-3 font-medium">
-                        <div className="flex flex-col">
-                          <span>{lojaNome(item.draft.lojaCnpj)}</span>
-                          <span className="text-[10px] text-muted-foreground">{item.draft.lojaCnpj}</span>
-                        </div>
-                      </td>
-                      <td className="p-3 font-bold text-gray-900">{item.draft.tag || '—'}</td>
-                      <td className="p-3">{item.draft.local || '—'}</td>
-                      <td className="p-3">
-                        {item.draft.marca || '—'} {item.draft.potencia ? `· ${item.draft.potencia}` : ''}
-                      </td>
-                      <td className="p-3">
-                        {item.draft.tipoEquipamento || '—'} {item.draft.modelo ? `· ${item.draft.modelo}` : ''}
-                      </td>
-                      <td className="p-3">
-                        <Button
-                          variant="ghost"
-                          className="h-7 w-7 p-0 text-red-600 hover:bg-red-100"
-                          onClick={() => removerLinha(item.idTemp)}
-                        >
-                          <Trash2 size={14} />
-                        </Button>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
           </div>
-        </Card>
-      )}
+          }
+        </div>
+      </Card>
     </div>
   );
 }

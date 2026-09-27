@@ -3,7 +3,7 @@ import { FileText, Pencil, Save, Trash2, X, Wrench, Shield, Calendar } from 'luc
 import { Badge, Button } from '@/components/ui';
 import { statusTone } from '@/lib/ui-helpers';
 import ManutencaoForm from '@/components/ManutencaoForm';
-import { totalNotasManutencao, totalIndividualManutencao, type ManutencaoDraft } from '@/lib/drafts';
+import { totalNotasManutencao, totalIndividualManutencao, labelTipoManutencao, type ManutencaoDraft } from '@/lib/drafts';
 import { useAcm } from '@/hooks/use-acm';
 import { formatBRL, formatData, toNumber } from '@/lib/format';
 import type { Manutencao } from '@/lib/types';
@@ -25,7 +25,7 @@ export default function ManutencaoCard({ manutencao }: {manutencao: Manutencao;}
   };
 
   const tipoIcon = manutencao.tipo === 'preventiva' ? <Shield size={12} /> : <Wrench size={12} />;
-  const tipoLabel = manutencao.tipo === 'preventiva' ? 'Preventiva' : 'Corretiva';
+  const tipoLabel = labelTipoManutencao(manutencao);
   const tipoTone = manutencao.tipo === 'preventiva' ? 'purple' : 'neutral';
 
   if (editando) {
