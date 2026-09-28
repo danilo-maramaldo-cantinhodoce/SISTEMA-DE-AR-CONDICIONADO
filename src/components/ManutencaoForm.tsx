@@ -5,6 +5,7 @@ import { formatBRL, toNumber } from '@/lib/format';
 import { servicoVazio, totalNotasManutencao, totalIndividualManutencao, type ManutencaoDraft } from '@/lib/drafts';
 import { useAcm } from '@/hooks/use-acm';
 import type { ServicoItem, StatusManutencao, TipoNota } from '@/lib/types';
+import { ehPreventiva } from '@/lib/drafts';
 
 export default function ManutencaoForm({
   draft,
@@ -68,6 +69,7 @@ export default function ManutencaoForm({
 
   const totalNotas = totalNotasManutencao(draft.servicos);
   const totalIndividual = totalIndividualManutencao(draft.servicos);
+  const preventiva = ehPreventiva(String(draft.tipo));
 
   return (
     <div data-ev-id="ev_c4261e24c3" className="flex flex-col gap-5">
@@ -134,13 +136,22 @@ export default function ManutencaoForm({
         </div>
       )}
 
-      {draft.tipo === 'corretiva' && (
+      {preventiva && (
+        <Field label="Periodicidade da preventiva">
+          <Select value={String(draft.tipo).toLowerCase().includes('semestral') ? 'Preventiva Semestral' : 'Preventiva Trimestral'} onChange={(e) => onChange({ tipo: e.target.value as ManutencaoDraft['tipo'] })}>
+            <option value="Preventiva Semestral">Semestral</option>
+            <option value="Preventiva Trimestral">Trimestral</option>
+          </Select>
+        </Field>
+      )}
+
+      {!preventiva && (
         <Field label="Problema atestado" hint="Se nenhuma informação for inserida, o campo permanece em branco">
           <TextArea value={draft.problemaAtestado} onChange={(e) => onChange({ problemaAtestado: e.target.value })} placeholder="" />
         </Field>
       )}
 
-      <Field label={draft.tipo === 'preventiva' ? 'Serviços realizados' : 'Serviço executado / solução'}>
+      <Field label={preventiva ? 'Serviços realizados' : 'Serviço executado / solução'}>
         <TextArea value={draft.solucao} onChange={(e) => onChange({ solucao: e.target.value })} placeholder="" />
       </Field>
 

@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { AirVent, Briefcase, FileSpreadsheet, History, Shield, Snowflake, Wrench } from 'lucide-react';
+import { AirVent, Briefcase, FileSpreadsheet, History, LogOut, Shield, Snowflake, Wrench } from 'lucide-react';
 import CadastroEquipamento from '@/components/tabs/CadastroEquipamento';
 import CadastroPrestador from '@/components/tabs/CadastroPrestador';
 import Historico from '@/components/tabs/Historico';
@@ -7,6 +7,7 @@ import ManutencaoCorretiva from '@/components/tabs/ManutencaoCorretiva';
 import ManutencaoPreventiva from '@/components/tabs/ManutencaoPreventiva';
 import ImportacaoDados from '@/components/tabs/ImportacaoDados';
 import { useAcm } from '@/hooks/use-acm';
+import { ehPreventiva } from '@/lib/drafts';
 
 type TabId = 'equipamento' | 'prestador' | 'historico' | 'manutencao' | 'preventiva' | 'importacao';
 
@@ -20,13 +21,13 @@ const TABS: { id: TabId; label: string; icon: typeof AirVent }[] = [
 ];
 
 export default function Index() {
-  const { equipamentos, prestadores, manutencoes } = useAcm();
+  const { equipamentos, prestadores, manutencoes, cloudStatus, signOut } = useAcm();
   const [tab, setTab] = useState<TabId>('equipamento');
   const [lojaFoco, setLojaFoco] = useState('');
   const [equipFoco, setEquipFoco] = useState('');
 
-  const corretivas = (manutencoes ?? []).filter((m) => m.tipo === 'corretiva' || !m.tipo).length;
-  const preventivas = (manutencoes ?? []).filter((m) => m.tipo === 'preventiva').length;
+  const corretivas = (manutencoes ?? []).filter((m) => !ehPreventiva(String(m.tipo))).length;
+  const preventivas = (manutencoes ?? []).filter((m) => ehPreventiva(String(m.tipo))).length;
 
   return (
     <div data-ev-id="ev_acc56ab6e0" className="min-h-screen bg-gradient-to-b from-slate-50 to-slate-100">
@@ -41,7 +42,7 @@ export default function Index() {
               <p data-ev-id="ev_23611153b1" className="text-sm text-muted-foreground">Controle de equipamentos, prestadores, histórico e manutenção por loja</p>
             </div>
           </div>
-          <div data-ev-id="ev_6911c8e7ac" className="flex flex-row gap-3 text-center">
+          <div data-ev-id="ev_6911c8e7ac" className="flex flex-row flex-wrap justify-center gap-3 text-center">
             <div data-ev-id="ev_fad1834363" className="flex flex-col rounded-lg bg-muted px-3 py-2">
               <span data-ev-id="ev_c02aa1919f" className="text-lg font-bold text-gray-900">{equipamentos.length}</span>
               <span data-ev-id="ev_209777f238" className="text-xs text-muted-foreground">Equipamentos</span>
@@ -58,6 +59,11 @@ export default function Index() {
               <span data-ev-id="ev_de4d05cd2e" className="text-lg font-bold text-purple-900 flex items-center gap-1"><Shield size={14} /> {preventivas}</span>
               <span data-ev-id="ev_ea203a3e1a" className="text-xs text-purple-700">Preventivas</span>
             </div>
+            {cloudStatus === 'ready' && (
+              <button type="button" title="Sair da conta" aria-label="Sair da conta" onClick={() => void signOut()} className="flex items-center justify-center rounded-lg border border-border px-3 py-2 text-gray-600 hover:bg-muted">
+                <LogOut size={18} />
+              </button>
+            )}
           </div>
         </div>
       </header>

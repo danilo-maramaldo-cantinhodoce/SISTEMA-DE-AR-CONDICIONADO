@@ -1,15 +1,32 @@
+- NO CAMPO DE VIDA ÚTIL DEVE-SE CALCULAR AUTOMATICAMENTE DATA DE DESATIVAÇÃO - (OPERAÇÃO DE MENOS) DATA DE INSTALAÇÃO E VALOR DEVE VOLTAR EM ANOS. EXEMPLO: 6 ANOS E 4 MESES.
+
+- APÓS PREEENCHER O CAMPO DE DATA DE DESATIVAÇÃO. AUTOMATICAMENTE DEVE SINALIZAR EM VERMELHO QUE A MÁQUINA FOI DESATIVADA. 
 
 
--NO HISTÓRICO DEVE APARECER OS CUSTOS SEPARADOS DE PREVENTIVA E CORRETIVA SUBSTITUI O CUSTO TOTAL PELOS OS CUSTOS DE PREVENTIVA E CORRETIVA NA PARTE ONDE TEM A QUANTIDADE DE EQUIPAMENTO E CUSTO TOTAL.
- 
+- ANA ABA DE HISTÓRICO, AO ESCOLHER A LOJA, DEVE APARCER OS CARDS DE EQUIPAMENTOS, NO LUGAR DE CUSTO TOTAL DEVE-SE APARECER CUSTO COM PREVENTIVA, CUSTO COM CORRETIVA SEPARADOS. 
+
+NA PARTE DE CADASTRARA A NOTA FISCAL. DEVE-SE ESCOLHER CADA MÁQUINA ENVOLVIDA NA MANUTENÇÃO EXEMPLO: EQ 01, EQ 01 E O CUSTO PARA CADA UMA E O TIPO, SE É CORRTIVA OU PREVENTIVA. 
+POR MÁQUINA DEVE SER ATRIBUÍDO O CUSTO INDIVIDUAL E O CUSTO TOTAL DA NOTA DEVE FICAR AUTOMÁTICO SOMANDO TUDO. EM UMA MESMA MÁQUINA PODE TER UMA PREVENTIVA E CORRETIVA CADASTRADA DA NOTA. SENDO QUE NA PREVENTIVA TEM DUAS FORMAS SEMESTRAL E TRISMESTRAL.VAI FICA MAIS OU MENOS ASSIM:
+
+UMA NOTA FISCAL COM O VALOR DE R$ 1000
+EM QUE TENHA UMA PREVENTIVA TRISMESTRAL DAS EQ 01, EQ 02 E EQ 03. SENDO QUE A PREVENTIVA TRIMESTRAL É R$ 250 E FOI FEITA NAS 3. E UMA CORRETIVA FOI FEITA NA EQ 1. 0 NO VALOR DE R$ 250. CADASTRANDO A NOTA DEVE TER OS CAMPOS PARA PREENCHER ESSAS INFORMAÇÕES.
 
 
-- FAZ UMA ABA A MAIS DO LADO DE MANUTENÇÕES PARA TER TODAS AS MANUTENÇÕES PREVENTIVAS DA SEGUINTE FORMA. DEVE APARECER AS LOJAS QUE TÊM MANUTENÇÃO PREVENTIVA PARA O MÊS ATUAL. 
+NOTA FISCAL 
+EQ 01 - (MARCAR PREVENTIVA SEMESTRAL/PREVENTIVA TRISMESTRAL/CORRETIVA) - VALOR
+EQ 01 - (CORRETIVA) - R$ VALOR
+EQ 01 - (PREVENTIVA TRIMESTRAL)
 
 
-COHAMA
-ULTIMA MANUTENÇÃO PREVENTIVA: TRIMESTRAL DATA: _/_/_
-PRÓXIMA MANUTENÇÃO PREVENTIVA: SEMESTRAL  DATA: _/_/_
+
+- NA ABA DE MANUTENÇÕES PREVENTIVAS DEVE APARECER AS LOJAS QUE TÊM MANUTENÇÃO PREVENTIVA PARA O MÊS ATUAL. DEVE-SE PEGAR A ÚLTIMA DATA CADASTRADA DE MANUTENÇÃO PREVENTIVA E O TIPO DA MANUTENÇÃO: SEMESTRAL E TRIMESTRAL E TRAZER PARA A TELA DA SEGUINTE FORMA.
+
+EXEMPLO: ISSO É SÓ UM EXEMPLO PARA MOSTRAR MAIS OU MENOS COMO DEVE FICAR.
+
+
+COHAMA:
+ULTIMA MANUTENÇÃO PREVENTIVA:TRIMESTRAL DATA: _/_/_
+PRÓXIMA MANUTENÇÃO PREVENTIVA: SEMESTRAL DATA: _/_/_
 
 COHAB
 ULTIMA MANUTENÇÃO PREVENTIVA: TRIMESTRAL  DATA: _/_/_
@@ -18,141 +35,10 @@ PRÓXIMA MANUTENÇÃO PREVENTIVA: SEMESTRAL  DATA: _/_/_
 
 
 
-NA PARTE DE CADASTRARA A NOTA FISCAL. DEVE-SE ESCOLHER CADA MÁQUINA ENVOLVINA NA MANUTENÇÃO EXEMPLO: EQ 01, EQ 01 E O CUSTO PARA CADA UMA E O TIPO, SE É CORRTIVA OU PREVENTIVA. 
-POR MÁQUINA DEVE SER ATRIBUÍDO O CUSTO INDIVIDUAL E O CUSTO TOTAL DA NOTA DEVE FEICAR AUTOMÁTICO SOMANDO TUDO. EM UMA MESMA MÁQUINA PODE TER UMA PREVENTIVA E CORRETIVA CADASTRADA DA NOTA. SENDO QUE NA PREVENTIVA TEM DUAS FORMAS SEMESTRAL E TRISMESTRAL.VAI FICA MAIS OU MENOS ASSIM:
 
-UMA NOTA FISCAL COM O VALOR DE R$ 1000
-EM QUE TENHA UMA PREVENTIVA TRISMESTRAL DAS EQ 01, EQ 02 E EQ 03. SENDO QUE A PREVENTIVA TRIMESTRAL É R$ 250 E FOI FEITA NAS 3. E UMA CORRETIVA FOI FEITA NA EQ 10 NO VALOR DE R$ 250. CADASTRANDO A NOTA DEVE TER OS CAMPOS PARA PREENCHER ESSAS INFORMAÇÕES.
 
+ALTERA A ABA DE IMPORTAÇÃO DE DADOS. DEVE SER UMA MESMA PLANILHA EM EXCEL PARA FACILITAR CADASTRO DE EQUIPAMENTOS E DE MANUTENÇÕES. PARA FACILITAR A IMPLEMETAÇÃO DO SISTEMA E IMPORTAÇÃO DOS DADOS. 
 
-NOTA FISCAL 
 
-EQ 01 - (MARCAR PREVENTIVA SEMESTRAL/PREVENTIVA TRISMESTRAL/CORRETIVA) - VALOR
 
-EQ 01 - (CORRETIVA) - R$ VALOR
-
-EQ 01 - (PREVENTIVA TRIMESTRAL)
-
-
-FAZ UMA PARTE DE IMPORTAÇÃO DE DADOS. UMA MESMA PLANILHA QUE TENHA CADASTRO DE EQUIPAMENTOS E DE MANUTENÇÕES. PARA FACILITAR A IMPLEMETAÇÃO DO SISTEMA. 
-
-
-SOBRE O STATUS DO CADASTRO DO EQUIPAMENTO, SÓ DEVE TER DUAS OPÇÕES:  EM OPERAÇÃO E DESATIVADA. QUANDO DESATIVADA COLOCAR UMA FORMATAÇÃO VERMELHA SUTIL NA LINHA DA BORDA DO CADASTRO.
-ALÉM DA DATA DE INSTALAÇÃO DEVE TER A DATA DE DESATIVAMENTO DA MÁQUINA. E AO LADO DO CAMPO A VIDA ÚTIL DELA. EXEMPLO: 6 ANOS E 3 MESES. 
-
-
-FAZ ESSAS ALTERAÇÕES E ME SINALIZA ONDE CADA PARTE DO CÓDIGO DEVE SER COLADA. DIVIDA OS CÓDIGOS POR ARQUIVOS.
- 
-
-Altera a forma de armazenamento de dados. atualmente está no localstorage, quero colocar para o supabase. 
-
-
-
-
-
-
-NO CAMPO DE VIDA ÚTIL DEVE-SE CALCULAR AUTOMATICAMENTE DATA DE DESATIVAÇÃO - DATA DE INSTALAÇÃO E VALOR DEVE VOLTAR EM ANOS. EXEMPLO: 6 ANOS E 4 MESES.
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-Aqui está a lista numerada dos arquivos que precisaremos atualizar/criar:
-
-src/lib/types.ts (Definições das interfaces e tipos de equipamentos, manutenções, notas fiscais e importação)
-
-src/lib/constants.ts (Constantes gerais, seletores de status e tipos de manutenção)
-
-src/context/acm-context.ts / src/context/acm-store.tsx (Estado global, salvamento de NFs com múltiplas máquinas e função de importação de dados)
-
-
-src/components/EquipamentoFields.tsx (Campos de status "Em Operação/Desativada", data de desativação e vida útil)
-
-src/components/tabs/CadastroEquipamento.tsx (Tabela/lista com destaque visual de borda vermelha para equipamentos desativados)
-
-src/components/ManutencaoForm.tsx (Formulário de lançamento de Nota Fiscal com suporte a múltiplas máquinas e cálculo automático do total)
-
-src/components/tabs/Historico.tsx (Substituição do custo total genérico pela divisão de Custos de Preventiva e Corretiva)
-
-
-src/components/tabs/ManutencaoPreventiva.tsx (Novo arquivo: Aba de Manutenções Preventivas por Loja)
-
-src/components/tabs/ImportacaoDados.tsx (Novo arquivo: Tela/módulo de importação de dados via planilha modelo)
-
-src/pages/Index.tsx (ou App.tsx) (Ajuste das abas de navegação para incluir as novas seções)
-
-
-
-
-
-
-
-
-
-
-
-# PROMPT PARA ATUALIZAÇÃO DO SISTEMA DE GESTÃO DE MANUTENÇÃO
-
-Por favor, atualize o sistema atual implementando as seguintes melhorias, correções e novas funcionalidades. Os códigos alterados devem ser divididos e informados por arquivo/componente correspondente do projeto.
-
----
-
-## 1. Histórico de Custos (Preventiva vs. Corretiva)
-* **Substituição do Custo Total:** Na seção onde aparecem a quantidade de equipamentos e o custo total geral, remova o "Custo Total" genérico e substitua por dois campos separados: **Custo Total de Preventiva** e **Custo Total de Corretiva**.
-* O histórico geral de manutenções deve refletir essa divisão de custos de forma clara.
-
-## 2. Nova Aba de Manutenções Preventivas
-* Crie uma nova aba/seção localizada ao lado da aba de "Manutenções" existente.
-* Esta aba deve listar todas as **lojas** que possuem manutenção preventiva agendada ou mapeada para o **mês atual**, seguindo exatamente este padrão visual/estrutural:
-  - **[NOME DA LOJA (ex: COHAMA)]**
-    - ÚLTIMA MANUTENÇÃO PREVENTIVA: [Tipo: ex: TRIMESTRAL] | DATA: DD/MM/AAAA
-    - PRÓXIMA MANUTENÇÃO PREVENTIVA: [Tipo: ex: SEMESTRAL] | DATA: DD/MM/AAAA
-
-## 3. Cadastro de Nota Fiscal e Múltiplas Máquinas
-* Atualize o formulário de cadastro de Notas Fiscais para permitir a seleção de **várias máquinas envolvidas em uma mesma nota**.
-* Para cada máquina adicionada na nota, deve ser possível preencher:
-  1. A máquina específica (ex: EQ 01, EQ 02).
-  2. O tipo de manutenção realizada: **Preventiva Semestral**, **Preventiva Trimestral** ou **Corretiva**.
-  3. O custo individual para aquela manutenção específica na máquina.
-* **Cálculo Automático:** O custo total da nota fiscal deve ser calculado automaticamente somando todos os custos individuais informados nas máquinas.
-* *Nota:* Uma mesma máquina pode ter mais de uma manutenção cadastrada na mesma nota (ex: uma preventiva e uma corretiva simultâneas).
-* *Exemplo de funcionamento esperado:* 
-  - Nota fiscal de R$ 1.000,00 contendo: Preventiva Trimestral na EQ 01, EQ 02 e EQ 03 (R$ 250 cada) + Corretiva na EQ 10 (R$ 250). O sistema deve permitir lançar esses itens individualmente e fechar o total de forma automática.
-
-## 4. Importação de Dados
-* Desenvolva uma funcionalidade/página de **Importação de Dados** utilizando uma única planilha modelo (Excel/CSV).
-* A planilha deve contemplar tanto o **cadastro de equipamentos** quanto o **histórico de manutenções**, facilitando a carga inicial de dados no sistema.
-
-## 5. Status, Datas e Vida Útil do Equipamento
-* **Status do Equipamento:** O campo de status deve possuir apenas duas opções estritas: **Em Operação** e **Desativada**.
-* **Formatação Visual:** Quando o equipamento estiver com o status **Desativada**, aplique uma formatação visual sutil de **borda vermelha** na linha correspondente do cadastro.
-* **Datas e Vida Útil:** 
-  - Além da "Data de Instalação", adicione o campo **Data de Desativação** (preenchido quando o equipamento for desativado).
-  - Ao lado do campo de desativação/instalação, inclua o campo de **Vida Útil** do equipamento no formato de texto livre estruturado (ex: *6 anos e 3 meses*).
-
----
-
-## Instruções de Resposta para a IA:
-Por favor, entregue as modificações **divididas por arquivos do projeto**, indicando claramente em qual arquivo e bloco de código cada alteração deve ser inserida ou substituída.
-
-
-
-Com base nas regras acima e na estrutura visual dos arquivos mostrada na imagem, por favor me entregue os códigos modificados separados por arquivo
+Altera a forma de armazenamento de dados. atualmente está no localstorage, quero colocar para o supabase.

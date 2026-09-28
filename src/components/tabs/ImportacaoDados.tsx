@@ -18,27 +18,30 @@ import { Badge, Button, Card, CardHeader, EmptyState } from '@/components/ui';
 import { useAcm } from '@/hooks/use-acm';
 import { LOJAS, lojaNome } from '@/lib/constants';
 import type { EquipamentoDraft } from '@/lib/drafts';
+import type { LinhaImportacaoPlanilha, TipoManutencaoItem } from '@/lib/types';
 
 interface LinhaImportacao {
   idTemp: string;
   draft: EquipamentoDraft;
+  importacao: LinhaImportacaoPlanilha;
   erros: string[];
   valido: boolean;
 }
 
 export default function ImportacaoDados() {
-  const { addEquipamento } = useAcm();
+  const { importarDadosPlanilha } = useAcm();
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const [linhas, setLinhas] = useState<LinhaImportacao[]>([]);
   const [nomeArquivo, setNomeArquivo] = useState<string>('');
   const [isDragging, setIsDragging] = useState(false);
-  const [importadoSucesso, setImportadoSucesso] = useState<number | null>(null);
+  const [importadoSucesso, setImportadoSucesso] = useState<{ equipamentos: number; manutencoes: number } | null>(null);
 
-  // 1. Download do Modelo CSV
-  const baixarModeloCSV = () => {
+  const baixarModeloExcel = async () => {
+    const XLSX = await import('xlsx');
     const cabecalhos = [
       'lojaCnpj',
+      'lojaNome',
       'tag',
       'local',
       'marca',
@@ -50,12 +53,21 @@ export default function ImportacaoDados() {
       'voltagem',
       'gasRefrigerante',
       'dataInstalacao',
+      'dataDesativacao',
       'status',
+      'dataManutencao',
+      'tipoManutencao',
+      'custoManutencao',
+      'notaNumero',
+      'notaTipo',
+      'prestadorNome',
+      'prestadorDocumento',
       'observacoes'
     ];
 
     const exemplo1 = [
       LOJAS[0]?.cnpj || '00000000000000',
+      LOJAS[0]?.nome || '',
       'AC-01',
       'Atendimento / Caixa',
       'Elgin',
@@ -67,12 +79,21 @@ export default function ImportacaoDados() {
       '220V',
       'R-410A',
       '2024-01-15',
-      'Ativo',
+      '',
+      'Em Operação',
+      '2026-09-15',
+      'Preventiva Trimestral',
+      '250,00',
+      '000123',
+      'DANFE',
+      'Prestador Exemplo',
+      '',
       'Equipamento em bom estado'
     ];
 
     const exemplo2 = [
       LOJAS[1]?.cnpj || '11111111111111',
+      LOJAS[1]?.nome || '',
       'AC-02',
       'Depósito',
       'Midea',
@@ -84,42 +105,51 @@ export default function ImportacaoDados() {
       '220V',
       'R-32',
       '2023-08-10',
-      'Ativo',
+      '',
+      'Em Operação',
+      '',
+      '',
+      '',
+      '',
+      '',
+      '',
       'Manutenção preventiva em dia'
     ];
-
-    const conteudoCSV =
-      '\uFEFF' + // UTF-8 BOM para abrir corretamente no Excel
-      [cabecalhos.join(';'), exemplo1.join(';'), exemplo2.join(';')].join('\n');
-
-    const blob = new Blob([conteudoCSV], { type: 'text/csv;charset=utf-8;' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = 'modelo_importacao_equipamentos.csv';
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
-    URL.revokeObjectURL(url);
+    const workbook = XLSX.utils.book_new();
+    const worksheet = XLSX.utils.aoa_to_sheet([cabecalhos, exemplo1, exemplo2]);
+    XLSX.utils.book_append_sheet(workbook, worksheet, 'Equipamentos e manutencoes');
+    XLSX.writeFile(workbook, 'modelo_importacao_equipamentos_manutencoes.xlsx');
   };
 
-  // 2. Processamento e Validação do CSV/JSON
-  const validarEConverterLinha = (dado: Record<string, string>, index: number): LinhaImportacao => {
+  const validarEConverterLinha = (dado: Record<string, unknown>, index: number): LinhaImportacao => {
     const erros: string[] = [];
+    const valores = Object.fromEntries(Object.entries(dado).map(([key, value]) => [key.trim().toLowerCase(), String(value ?? '').trim()]));
+    const campo = (...nomes: string[]) => nomes.map((nome) => valores[nome.toLowerCase()]).find(Boolean) || '';
+    const dataCampo = (...nomes: string[]) => {
+      const valor = campo(...nomes);
+      const br = valor.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/);
+      return br ? `${br[3]}-${br[2].padStart(2, '0')}-${br[1].padStart(2, '0')}` : valor;
+    };
 
-    const lojaCnpj = (dado.lojaCnpj || dado.cnpj || '').trim();
-    const tag = (dado.tag || dado.TAG || '').trim();
-    const local = (dado.local || dado.Local || '').trim();
-    const marca = (dado.marca || dado.Marca || '').trim();
-    const potencia = (dado.potencia || dado.Potencia || dado.potência || '').trim();
+    const lojaCnpj = campo('lojaCnpj', 'cnpj');
+    const lojaNomeInformado = campo('lojaNome', 'loja');
+    const tag = campo('tag', 'tagEquipamento');
+    const local = campo('local');
+    const marca = campo('marca');
+    const potencia = campo('potencia', 'potência');
+    const dataDesativacao = dataCampo('dataDesativacao');
+    const tipoManutencao = campo('tipoManutencao') as TipoManutencaoItem | '';
 
     if (!lojaCnpj) erros.push('CNPJ da Loja é obrigatório.');
     if (!tag) erros.push('TAG do equipamento é obrigatória.');
     if (!local) erros.push('Localização é obrigatória.');
+    if (tipoManutencao && !['Preventiva Semestral', 'Preventiva Trimestral', 'Corretiva'].includes(tipoManutencao)) {
+      erros.push('Tipo de manutenção inválido.');
+    }
 
-    const statusInformado = (dado.status || 'Em Operação').trim().toLowerCase();
+    const statusInformado = campo('status', 'statusEquipamento', 'Em Operação').toLowerCase();
     const status: EquipamentoDraft['status'] =
-      ['desativada', 'desativado', 'inativo', 'descartado'].includes(statusInformado)
+      dataDesativacao || ['desativada', 'desativado', 'inativo', 'descartado'].includes(statusInformado)
         ? 'Desativada'
         : 'Em Operação';
 
@@ -129,54 +159,51 @@ export default function ImportacaoDados() {
       local,
       marca,
       potencia,
-      tipoEquipamento: dado.tipoEquipamento || dado.tipo || '',
-      modelo: dado.modelo || '',
-      numeroSerie: dado.numeroSerie || dado.serie || '',
-      patrimonio: dado.patrimonio || '',
-      voltagem: dado.voltagem || '220V',
-      gasRefrigerante: dado.gasRefrigerante || dado.gas || '',
-      dataInstalacao: dado.dataInstalacao || '',
+      tipoEquipamento: campo('tipoEquipamento', 'tipo'),
+      modelo: campo('modelo'),
+      numeroSerie: campo('numeroSerie', 'serie'),
+      patrimonio: campo('patrimonio'),
+      voltagem: campo('voltagem') || '220V',
+      gasRefrigerante: campo('gasRefrigerante', 'gas'),
+      dataInstalacao: dataCampo('dataInstalacao'),
+      dataDesativacao,
+      vidaUtil: '',
       status,
-      observacoes: dado.observacoes || ''
+      observacoes: campo('observacoes')
+    };
+
+    const importacao: LinhaImportacaoPlanilha = {
+      lojaCnpj,
+      lojaNome: lojaNomeInformado,
+      tagEquipamento: tag,
+      local,
+      marca,
+      potencia,
+      tipoEquipamento: draft.tipoEquipamento,
+      modelo: draft.modelo,
+      numeroSerie: draft.numeroSerie,
+      voltagem: draft.voltagem,
+      gasRefrigerante: draft.gasRefrigerante,
+      dataInstalacao: draft.dataInstalacao,
+      dataDesativacao,
+      statusEquipamento: status,
+      dataManutencao: dataCampo('dataManutencao'),
+      tipoManutencao: tipoManutencao || undefined,
+      custoManutencao: campo('custoManutencao'),
+      notaNumero: campo('notaNumero'),
+      notaTipo: campo('notaTipo') as LinhaImportacaoPlanilha['notaTipo'],
+      prestadorNome: campo('prestadorNome'),
+      prestadorDocumento: campo('prestadorDocumento'),
+      observacoes: campo('observacoes'),
     };
 
     return {
       idTemp: `row-${index}-${Date.now()}`,
       draft,
+      importacao,
       erros,
       valido: erros.length === 0
     };
-  };
-
-  const processarTextoCSV = (texto: string) => {
-    const linhasTexto = texto.split(/\r\n|\n/).filter((l) => l.trim().length > 0);
-    if (linhasTexto.length < 2) {
-      alert('O arquivo selecionado está vazio ou não possui cabeçalhos válidos.');
-      return;
-    }
-
-    // Detecta separador (; ou ,)
-    const primeiraLinha = linhasTexto[0];
-    const separador = primeiraLinha.includes(';') ? ';' : ',';
-
-    const cabecalhos = primeiraLinha.split(separador).map((c) => c.trim().replace(/^"|"$/g, ''));
-
-    const resultado: LinhaImportacao[] = [];
-
-    for (let i = 1; i < linhasTexto.length; i++) {
-      const valores = linhasTexto[i].split(separador).map((v) => v.trim().replace(/^"|"$/g, ''));
-      if (valores.length <= 1 && !valores[0]) continue;
-
-      const objetoLinha: Record<string, string> = {};
-      cabecalhos.forEach((col, idx) => {
-        objetoLinha[col] = valores[idx] || '';
-      });
-
-      resultado.push(validarEConverterLinha(objetoLinha, i));
-    }
-
-    setLinhas(resultado);
-    setImportadoSucesso(null);
   };
 
   const processarArquivo = (file: File) => {
@@ -200,12 +227,23 @@ export default function ImportacaoDados() {
       };
       reader.readAsText(file);
     } else {
-      // Trata CSV / TXT
-      reader.onload = (e) => {
-        const conteudo = e.target?.result as string;
-        processarTextoCSV(conteudo);
+      reader.onload = async (e) => {
+        try {
+            const XLSX = await import('xlsx');
+          const workbook = XLSX.read(e.target?.result, { type: 'array' });
+          const worksheet = workbook.Sheets[workbook.SheetNames[0]];
+          const dados = XLSX.utils.sheet_to_json<Record<string, unknown>>(worksheet, { defval: '', raw: false, dateNF: 'yyyy-mm-dd' });
+          if (dados.length === 0) {
+            alert('A planilha está vazia ou não possui linhas de dados.');
+            return;
+          }
+          setLinhas(dados.map((linha, index) => validarEConverterLinha(linha, index)));
+          setImportadoSucesso(null);
+        } catch {
+          alert('Não foi possível ler a planilha. Verifique o arquivo e tente novamente.');
+        }
       };
-      reader.readAsText(file, 'UTF-8');
+      reader.readAsArrayBuffer(file);
     }
   };
 
@@ -242,11 +280,8 @@ export default function ImportacaoDados() {
     const validos = linhas.filter((l) => l.valido);
     if (validos.length === 0) return;
 
-    validos.forEach((item) => {
-      addEquipamento(item.draft);
-    });
-
-    setImportadoSucesso(validos.length);
+    const resultado = importarDadosPlanilha(validos.map((item) => item.importacao));
+    setImportadoSucesso({ equipamentos: resultado.countEquipamentos, manutencoes: resultado.countManutencoes });
     setLinhas([]);
     setNomeArquivo('');
     if (fileInputRef.current) fileInputRef.current.value = '';
@@ -261,11 +296,11 @@ export default function ImportacaoDados() {
       <Card>
         <CardHeader
           icon={<FileSpreadsheet className="text-emerald-600" size={18} />}
-          title="Importação em Lote de Equipamentos"
-          subtitle="Cadastre múltiplos ar-condicionados de uma só vez utilizando uma planilha de modelo padrão (CSV)."
+          title="Importação unificada de dados"
+          subtitle="Cadastre equipamentos e manutenções pela mesma planilha Excel."
           action={
-            <Button variant="outline" className="text-xs gap-2 border-emerald-200 text-emerald-800 hover:bg-emerald-50" onClick={baixarModeloCSV}>
-              <Download size={14} /> Baixar Planilha Modelo (CSV)
+            <Button variant="outline" className="text-xs gap-2 border-emerald-200 text-emerald-800 hover:bg-emerald-50" onClick={() => void baixarModeloExcel()}>
+              <Download size={14} /> Baixar modelo Excel
             </Button>
           }
         />
@@ -275,10 +310,7 @@ export default function ImportacaoDados() {
             <div className="flex flex-col gap-1">
               <span className="font-bold text-sm">Instruções para Importação:</span>
               <p>
-                1. Faça o download do arquivo modelo clicando no botão acima.<br />
-                2. Preencha os dados no Excel ou Google Sheets mantendo os nomes das colunas intactos.<br />
-                3. Certifique-se de preencher os campos obrigatórios: <strong>lojaCnpj</strong>, <strong>tag</strong> e <strong>local</strong>.<br />
-                4. Salve como <strong>CSV (separado por ponto e vírgula ou vírgula)</strong> e faça o upload na área abaixo.
+                Preencha os dados de manutenção na mesma linha do equipamento. Repita a TAG em novas linhas para registrar outros serviços na máquina. Os campos obrigatórios são <strong>lojaCnpj</strong>, <strong>tag</strong> e <strong>local</strong>; salve como XLSX ou CSV antes de importar.
               </p>
             </div>
           </div>
@@ -293,7 +325,7 @@ export default function ImportacaoDados() {
             <div className="flex flex-col">
               <span className="font-bold text-sm">Importação Concluída com Sucesso!</span>
               <span className="text-xs text-green-700">
-                {importadoSucesso} equipamento(s) foram adicionados ao sistema.
+                {importadoSucesso.equipamentos} equipamento(s) e {importadoSucesso.manutencoes} manutenção(ões) foram importados.
               </span>
             </div>
           </div>
@@ -326,10 +358,10 @@ export default function ImportacaoDados() {
           </div>
           <div className="flex flex-col items-center text-center gap-1">
             <span className="text-sm font-bold text-gray-900">
-              {nomeArquivo ? `Arquivo selecionado: ${nomeArquivo}` : 'Arraste seu arquivo CSV ou clique para selecionar'}
+              {nomeArquivo ? `Arquivo selecionado: ${nomeArquivo}` : 'Arraste seu arquivo Excel ou CSV ou clique para selecionar'}
             </span>
             <span className="text-xs text-muted-foreground">
-              Suporta arquivos .CSV e .JSON formatados
+              Suporta arquivos .XLSX, .XLS, .CSV e .JSON
             </span>
           </div>
         </div>

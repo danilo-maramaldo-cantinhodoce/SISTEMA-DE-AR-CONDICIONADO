@@ -2,7 +2,9 @@ import { useCallback, useEffect, useMemo, useState, type ReactNode } from 'react
 import { AcmContext, emptyState, STORAGE_KEY, type Persisted, type StoreValue } from '@/context/acm-context';
 import type { Equipamento, Manutencao, Prestador, TipoEvento, TipoManutencao, NotaFiscalLote, LinhaImportacaoPlanilha } from '@/lib/types';
 import { LOJAS } from '@/lib/constants';
-import { novoId, toNumber } from '@/lib/format';
+import { calcularVidaUtil, novoId, toNumber } from '@/lib/format';
+import { supabase, supabaseConfigured } from '@/lib/supabase';
+import SupabaseAuth from '@/components/SupabaseAuth';
 
 const OLD_KEY = 'gestao-ar-condicionado-v1';
 
@@ -32,7 +34,7 @@ function load(): Persisted {
         const migrated: Persisted = {
           equipamentos: (oldData.equipamentos ?? []).map(e => ({
             ...e,
-            status: String(e.status) === 'Desativado' ? 'Desativada' : (String(e.status) === 'Em operação' ? 'Em Operação' : e.status || 'Em Operação')
+            status: e.dataDesativacao || String(e.status) === 'Desativado' ? 'Desativada' : (String(e.status) === 'Em operação' ? 'Em Operação' : e.status || 'Em Operação')
           })),
           prestadores: oldData.prestadores ?? [],
           manutencoes,
@@ -48,7 +50,7 @@ function load(): Persisted {
     return {
       equipamentos: (parsed.equipamentos ?? []).map(e => ({
         ...e,
-        status: (String(e.status) === 'Desativado' || e.status === 'Desativada') ? 'Desativada' : 'Em Operação'
+        status: e.dataDesativacao || String(e.status) === 'Desativado' || e.status === 'Desativada' ? 'Desativada' : 'Em Operação'
       })),
       prestadores: parsed.prestadores ?? [],
       manutencoes: parsed.manutencoes ?? [],
@@ -61,6 +63,79 @@ function load(): Persisted {
 
 export function AcmStoreProvider({ children }: { children: ReactNode }) {
   const [state, setState] = useState<Persisted>(() => load());
+  const [cloudStatus, setCloudStatus] = useState<StoreValue['cloudStatus']>(supabaseConfigured ? 'loading' : 'disabled');
+  const [cloudError, setCloudError] = useState('');
+  const [cloudUserId, setCloudUserId] = useState<string | null>(null);
+
+  const carregarDadosDaNuvem = useCallback(async (userId: string) => {
+    if (!supabase) return;
+    setCloudStatus('loading');
+    setCloudError('');
+    const { data, error } = await supabase.from('acm_state').select('payload').eq('user_id', userId).maybeSingle();
+    if (error) {
+      setCloudError(error.message);
+      setCloudStatus('error');
+      return;
+    }
+    if (data?.payload) {
+      const remoto = data.payload as Partial<Persisted>;
+      setState({
+        equipamentos: remoto.equipamentos ?? [],
+        prestadores: remoto.prestadores ?? [],
+        manutencoes: remoto.manutencoes ?? [],
+        eventos: remoto.eventos ?? [],
+      });
+    }
+    setCloudUserId(userId);
+    setCloudStatus('ready');
+  }, []);
+
+  useEffect(() => {
+    if (!supabase) return;
+    let ativo = true;
+    supabase.auth.getSession().then(({ data, error }) => {
+      if (!ativo) return;
+      if (error) {
+        setCloudError(error.message);
+        setCloudStatus('error');
+      } else if (data.session) {
+        void carregarDadosDaNuvem(data.session.user.id);
+      } else {
+        setCloudStatus('auth');
+      }
+    });
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
+      if (!ativo) return;
+      if (event === 'SIGNED_IN' && session) {
+        void carregarDadosDaNuvem(session.user.id);
+      } else if (event === 'SIGNED_OUT') {
+        setCloudUserId(null);
+        setCloudStatus('auth');
+      }
+    });
+    return () => {
+      ativo = false;
+      subscription.unsubscribe();
+    };
+  }, [carregarDadosDaNuvem]);
+
+  const signIn: StoreValue['signIn'] = useCallback(async (email, password) => {
+    if (!supabase) return 'Supabase não configurado.';
+    const { error } = await supabase.auth.signInWithPassword({ email, password });
+    return error?.message ?? null;
+  }, []);
+
+  const signUp: StoreValue['signUp'] = useCallback(async (email, password) => {
+    if (!supabase) return 'Supabase não configurado.';
+    const { error, data } = await supabase.auth.signUp({ email, password });
+    if (error) return error.message;
+    if (!data.session) return 'Conta criada. Confirme seu e-mail e depois entre no sistema.';
+    return 'Conta criada e conectada.';
+  }, []);
+
+  const signOut: StoreValue['signOut'] = useCallback(async () => {
+    if (supabase) await supabase.auth.signOut();
+  }, []);
 
   useEffect(() => {
     try {
@@ -69,6 +144,21 @@ export function AcmStoreProvider({ children }: { children: ReactNode }) {
       /* storage indisponível */
     }
   }, [state]);
+
+  useEffect(() => {
+    if (!supabase || cloudStatus !== 'ready' || !cloudUserId) return;
+    const timeout = window.setTimeout(async () => {
+      if (!supabase) return;
+      const { error } = await supabase.from('acm_state').upsert({
+        user_id: cloudUserId,
+        payload: state,
+        updated_at: new Date().toISOString(),
+      });
+      if (error) setCloudError(`Falha ao salvar na nuvem: ${error.message}`);
+      else setCloudError('');
+    }, 500);
+    return () => window.clearTimeout(timeout);
+  }, [state, cloudStatus, cloudUserId]);
 
   const log = useCallback((equipamentoId: string, tipo: TipoEvento, descricao: string, detalhe = '') => {
     setState((prev) => ({
@@ -80,7 +170,13 @@ export function AcmStoreProvider({ children }: { children: ReactNode }) {
   const addEquipamento: StoreValue['addEquipamento'] = useCallback(
     (data) => {
       const agora = new Date().toISOString();
-      const novo: Equipamento = { ...data, id: novoId(), criadoEm: agora, atualizadoEm: agora };
+      const novo: Equipamento = {
+        ...data,
+        status: data.dataDesativacao ? 'Desativada' : data.status,
+        id: novoId(),
+        criadoEm: agora,
+        atualizadoEm: agora,
+      };
       setState((prev) => ({ ...prev, equipamentos: [novo, ...prev.equipamentos] }));
       log(novo.id, 'cadastro', 'Equipamento cadastrado', `${novo.tag} — ${novo.marca} ${novo.potencia} — Local: ${novo.local || '—'}`);
       return novo;
@@ -92,7 +188,14 @@ export function AcmStoreProvider({ children }: { children: ReactNode }) {
     (id, data) => {
       setState((prev) => ({
         ...prev,
-        equipamentos: prev.equipamentos.map((e) => (e.id === id ? { ...e, ...data, atualizadoEm: new Date().toISOString() } : e)),
+        equipamentos: prev.equipamentos.map((e) => {
+          if (e.id !== id) return e;
+          const atualizado = { ...e, ...data, atualizadoEm: new Date().toISOString() };
+          if (Object.prototype.hasOwnProperty.call(data, 'dataDesativacao')) {
+            atualizado.status = data.dataDesativacao ? 'Desativada' : (data.status || 'Em Operação');
+          }
+          return atualizado;
+        }),
       }));
       log(id, 'edicao', 'Cadastro do equipamento atualizado', Object.keys(data).join(', '));
     },
@@ -271,9 +374,9 @@ export function AcmStoreProvider({ children }: { children: ReactNode }) {
               gasRefrigerante: linha.gasRefrigerante || 'R-410A',
               dataInstalacao: linha.dataInstalacao || new Date().toISOString().substring(0, 10),
               dataDesativacao: linha.dataDesativacao || '',
-              vidaUtil: linha.vidaUtil || '',
+              vidaUtil: linha.vidaUtil || calcularVidaUtil(linha.dataInstalacao || '', linha.dataDesativacao || ''),
               patrimonio: linha.patrimonio || '',
-              status: linha.statusEquipamento === 'Desativada' ? 'Desativada' : 'Em Operação',
+              status: linha.dataDesativacao || linha.statusEquipamento === 'Desativada' ? 'Desativada' : 'Em Operação',
               observacoes: linha.observacoes || 'Importado via planilha',
               criadoEm: agora,
               atualizadoEm: agora,
@@ -283,7 +386,8 @@ export function AcmStoreProvider({ children }: { children: ReactNode }) {
           } else {
             // Atualiza dados adicionais se informados
             if (linha.dataDesativacao) eq.dataDesativacao = linha.dataDesativacao;
-            if (linha.vidaUtil) eq.vidaUtil = linha.vidaUtil;
+            if (linha.dataDesativacao) eq.status = 'Desativada';
+            if (linha.vidaUtil || linha.dataDesativacao) eq.vidaUtil = linha.vidaUtil || calcularVidaUtil(eq.dataInstalacao, linha.dataDesativacao || eq.dataDesativacao || '');
             if (linha.statusEquipamento) eq.status = linha.statusEquipamento;
           }
 
@@ -417,6 +521,11 @@ export function AcmStoreProvider({ children }: { children: ReactNode }) {
     
     return {
       ...state,
+      cloudStatus,
+      cloudError,
+      signIn,
+      signUp,
+      signOut,
       addEquipamento,
       updateEquipamento,
       removeEquipamento,
@@ -442,6 +551,11 @@ export function AcmStoreProvider({ children }: { children: ReactNode }) {
     };
   }, [
     state,
+    cloudStatus,
+    cloudError,
+    signIn,
+    signUp,
+    signOut,
     addEquipamento,
     updateEquipamento,
     removeEquipamento,
@@ -456,5 +570,16 @@ export function AcmStoreProvider({ children }: { children: ReactNode }) {
     importarDadosPlanilha,
   ]);
 
-  return <AcmContext.Provider value={value}>{children}</AcmContext.Provider>;
+  return (
+    <AcmContext.Provider value={value}>
+      {cloudStatus !== 'disabled' && cloudStatus !== 'ready' ? (
+        <SupabaseAuth status={cloudStatus === 'loading' ? 'loading' : cloudStatus === 'error' ? 'error' : 'auth'} error={cloudError} onSignIn={signIn} onSignUp={signUp} />
+      ) : (
+        <>
+          {cloudError && <p role="alert" className="bg-red-50 px-4 py-2 text-sm text-red-800">{cloudError}</p>}
+          {children}
+        </>
+      )}
+    </AcmContext.Provider>
+  );
 }

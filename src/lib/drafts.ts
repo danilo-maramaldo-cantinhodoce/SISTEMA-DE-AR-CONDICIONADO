@@ -39,7 +39,7 @@ export const servicoVazio = (): ServicoItem => ({
 
 export const manutencaoVazia = (equipamentoId = '', tipo: TipoManutencao = 'corretiva'): ManutencaoDraft => ({
 	equipamentoId,
-	tipo,
+	tipo: tipo === 'preventiva' ? 'Preventiva Trimestral' : tipo,
 	data: hoje(),
 	problemaAtestado: '',
 	solucao: '',
@@ -47,6 +47,8 @@ export const manutencaoVazia = (equipamentoId = '', tipo: TipoManutencao = 'corr
 	servicos: [servicoVazio()],
 	observacoes: '',
 });
+
+export const ehPreventiva = (tipo: string) => tipo.toLowerCase().includes('preventiva');
 
 /** Soma dos valores globais das notas fiscais */
 export const totalNotasManutencao = (servicos: ServicoItem[]) => 
@@ -60,17 +62,26 @@ export const totalIndividualManutencao = (servicos: ServicoItem[]) =>
 export const custoIndividualAcumulado = (manutencoes: Manutencao[]) =>
 	(manutencoes ?? []).reduce((acc, m) => acc + totalIndividualManutencao(m.servicos), 0);
 
-/** Calcula próxima data de manutenção preventiva (90 dias após a última) */
-export const proximaPreventiva = (manutencoes: Manutencao[]): Date | null => {
+export const cronogramaPreventiva = (manutencoes: Manutencao[]) => {
 	const preventivas = (manutencoes ?? [])
-		.filter((m) => m.tipo === 'preventiva' && m.status === 'Concluída')
+		.filter((m) => ehPreventiva(String(m.tipo)))
 		.sort((a, b) => (a.data > b.data ? -1 : 1));
-	
 	if (preventivas.length === 0) return null;
-	
-	const ultima = new Date(preventivas[0].data);
-	ultima.setDate(ultima.getDate() + 90);
-	return ultima;
+	const ultima = preventivas[0];
+	const dataProxima = new Date(`${ultima.data}T12:00:00`);
+	const ultimaSemestral = String(ultima.tipo).toLowerCase().includes('semestral');
+	const tipoProxima = ultimaSemestral ? 'Preventiva Trimestral' : 'Preventiva Semestral';
+	const dia = dataProxima.getDate();
+	dataProxima.setDate(1);
+	dataProxima.setMonth(dataProxima.getMonth() + (ultimaSemestral ? 3 : 6));
+	const ultimoDiaMes = new Date(dataProxima.getFullYear(), dataProxima.getMonth() + 1, 0).getDate();
+	dataProxima.setDate(Math.min(dia, ultimoDiaMes));
+	return { ultima, tipoProxima, dataProxima };
+};
+
+/** Calcula a próxima preventiva alternando os ciclos semestral e trimestral. */
+export const proximaPreventiva = (manutencoes: Manutencao[]): Date | null => {
+	return cronogramaPreventiva(manutencoes)?.dataProxima ?? null;
 };
 
 /** Verifica se a preventiva está atrasada */

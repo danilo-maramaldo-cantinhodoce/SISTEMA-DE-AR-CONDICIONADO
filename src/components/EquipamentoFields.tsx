@@ -3,6 +3,7 @@ import LojaSelect from '@/components/LojaSelect';
 import { GASES, MARCAS, POTENCIAS, STATUS_EQUIPAMENTO, TIPOS_EQUIPAMENTO, VOLTAGENS } from '@/lib/constants';
 import type { EquipamentoDraft } from '@/lib/drafts';
 import type { StatusEquipamento } from '@/lib/types';
+import { calcularVidaUtil } from '@/lib/format';
 
 interface Props {
   draft: EquipamentoDraft;
@@ -59,8 +60,13 @@ export default function EquipamentoFields({ draft, onChange, modoCompleto = fals
       </Field>
 
       {/* REQUISITO 5: Seleção de status restrita a 'Em Operação' e 'Desativada' */}
-      <Field label="Status">
-        <Select value={draft.status} onChange={(e) => onChange({ status: e.target.value as StatusEquipamento })}>
+      <Field label={draft.dataDesativacao ? 'Status · equipamento desativado' : 'Status'}>
+        <Select
+          className={draft.dataDesativacao ? 'border-red-500 bg-red-50 font-semibold text-red-700' : ''}
+          disabled={Boolean(draft.dataDesativacao)}
+          value={draft.dataDesativacao ? 'Desativada' : draft.status}
+          onChange={(e) => onChange({ status: e.target.value as StatusEquipamento })}
+        >
           {STATUS_EQUIPAMENTO.map((s) => (
             <option data-ev-id="ev_b5ab3b8a3a" key={s} value={s}>
               {s}
@@ -108,7 +114,15 @@ export default function EquipamentoFields({ draft, onChange, modoCompleto = fals
       </Field>
 
       <Field label="Data de instalação">
-        <Input type="date" value={draft.dataInstalacao || ''} onChange={(e) => onChange({ dataInstalacao: e.target.value })} />
+        <Input
+          type="date"
+          value={draft.dataInstalacao || ''}
+          max={draft.dataDesativacao || undefined}
+          onChange={(e) => onChange({
+            dataInstalacao: e.target.value,
+            vidaUtil: calcularVidaUtil(e.target.value, draft.dataDesativacao || ''),
+          })}
+        />
       </Field>
 
       {/* REQUISITO 5: Novos campos Data de Desativação e Vida Útil dispostos lado a lado */}
@@ -116,15 +130,23 @@ export default function EquipamentoFields({ draft, onChange, modoCompleto = fals
         <Input
           type="date"
           value={draft.dataDesativacao || ''}
-          onChange={(e) => onChange({ dataDesativacao: e.target.value })}
+          min={draft.dataInstalacao || undefined}
+          onChange={(e) => {
+            const dataDesativacao = e.target.value;
+            onChange({
+              dataDesativacao,
+              status: dataDesativacao ? 'Desativada' : 'Em Operação',
+              vidaUtil: calcularVidaUtil(draft.dataInstalacao || '', dataDesativacao),
+            });
+          }}
         />
       </Field>
 
-      <Field label="Vida útil" hint="Formato livre estruturado (ex: 6 anos e 3 meses)">
+      <Field label="Vida útil" hint="Calculada a partir das datas de instalação e desativação">
         <Input
+          readOnly
           value={draft.vidaUtil || ''}
-          onChange={(e) => onChange({ vidaUtil: e.target.value })}
-          placeholder="Ex.: 6 anos e 3 meses"
+          placeholder="Preencha as datas de instalação e desativação"
         />
       </Field>
 

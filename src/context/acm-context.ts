@@ -19,6 +19,11 @@ export interface Persisted {
 }
 
 export interface StoreValue extends Persisted {
+  cloudStatus: 'disabled' | 'loading' | 'auth' | 'ready' | 'error';
+  cloudError: string;
+  signIn: (email: string, password: string) => Promise<string | null>;
+  signUp: (email: string, password: string) => Promise<string | null>;
+  signOut: () => Promise<void>;
   addEquipamento: (data: Omit<Equipamento, 'id' | 'criadoEm' | 'atualizadoEm'>) => Equipamento;
   updateEquipamento: (id: string, data: Partial<Equipamento>) => void;
   removeEquipamento: (id: string) => void;

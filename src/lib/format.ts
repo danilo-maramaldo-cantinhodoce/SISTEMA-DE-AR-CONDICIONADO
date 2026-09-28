@@ -54,6 +54,27 @@ export function formatDataHora(iso: string): string {
 	return `${d.toLocaleDateString('pt-BR')} às ${d.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}`;
 }
 
+export function calcularVidaUtil(dataInstalacao: string, dataDesativacao: string): string {
+	if (!dataInstalacao || !dataDesativacao) return '';
+	const [anoInicio, mesInicio, diaInicio] = dataInstalacao.split('-').map(Number);
+	const [anoFim, mesFim, diaFim] = dataDesativacao.split('-').map(Number);
+	if (![anoInicio, mesInicio, diaInicio, anoFim, mesFim, diaFim].every(Number.isFinite)) return '';
+	const inicio = new Date(anoInicio, mesInicio - 1, diaInicio);
+	const fim = new Date(anoFim, mesFim - 1, diaFim);
+	if (fim < inicio) return '';
+	let anos = anoFim - anoInicio;
+	let meses = mesFim - mesInicio;
+	if (diaFim < diaInicio) meses -= 1;
+	if (meses < 0) {
+		anos -= 1;
+		meses += 12;
+	}
+	const partes = [];
+	if (anos > 0) partes.push(`${anos} ${anos === 1 ? 'ano' : 'anos'}`);
+	if (meses > 0) partes.push(`${meses} ${meses === 1 ? 'mês' : 'meses'}`);
+	return partes.join(' e ') || '0 meses';
+}
+
 export const hoje = () => new Date().toISOString().slice(0, 10);
 
 export const novoId = () => `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`;

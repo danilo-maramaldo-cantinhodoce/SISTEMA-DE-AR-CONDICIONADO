@@ -1,23 +1,40 @@
 import { useState } from 'react';
-import { CheckCircle2, Save, Shield, Wrench } from 'lucide-react';
+import { CheckCircle2, Plus, Save, Shield, Trash2, Wrench } from 'lucide-react';
 import { Badge, Button, Card, CardHeader, EmptyState, Field, Input, Select } from '@/components/ui';
 import LojaSelect from '@/components/LojaSelect';
 import ManutencaoForm from '@/components/ManutencaoForm';
 import { manutencaoVazia, type ManutencaoDraft } from '@/lib/drafts';
 import ManutencaoCard from '@/components/ManutencaoCard';
 import { useAcm } from '@/hooks/use-acm';
-import type { TipoManutencao } from '@/lib/types';
+import { formatBRL, novoId, toNumber } from '@/lib/format';
+import { TIPOS_NOTA } from '@/lib/constants';
+import type { ItemManutencaoNota, TipoManutencao, TipoManutencaoItem, TipoNota } from '@/lib/types';
+
+const novaLinhaNota = (): ItemManutencaoNota => ({
+  id: novoId(),
+  equipamentoId: '',
+  tipoManutencao: 'Corretiva',
+  custoIndividual: '',
+});
 
 export default function ManutencaoCorretiva() {
-  const { equipamentosDaLoja, addManutencao, addManutencaoEmLote, manutencoesDoEquipamento } = useAcm();
+  const { equipamentosDaLoja, addManutencao, addManutencaoEmLote, manutencoesDoEquipamento, prestadores, addNotaFiscalLote } = useAcm();
   const [loja, setLoja] = useState('');
   const [equipamentoIds, setEquipamentoIds] = useState<string[]>([]);
   const [tipoManutencao, setTipoManutencao] = useState<TipoManutencao>('corretiva');
   const [draft, setDraft] = useState<ManutencaoDraft>(manutencaoVazia('', 'corretiva'));
   const [erro, setErro] = useState('');
   const [ok, setOk] = useState('');
+  const [numeroNota, setNumeroNota] = useState('');
+  const [tipoNota, setTipoNota] = useState<TipoNota | ''>('DANFE');
+  const [dataNota, setDataNota] = useState(new Date().toISOString().slice(0, 10));
+  const [prestadorNota, setPrestadorNota] = useState('');
+  const [itensNota, setItensNota] = useState<ItemManutencaoNota[]>([novaLinhaNota()]);
+  const [sucessoNota, setSucessoNota] = useState('');
+  const [erroNota, setErroNota] = useState('');
 
   const equipamentos = loja ? equipamentosDaLoja(loja) : [];
+  const totalNota = itensNota.reduce((total, item) => total + toNumber(item.custoIndividual), 0);
 
   // Histórico do primeiro equipamento selecionado
   const historico = equipamentoIds.length === 1 ? manutencoesDoEquipamento(equipamentoIds[0]) : [];
@@ -42,9 +59,9 @@ export default function ManutencaoCorretiva() {
     if (equipamentoIds.length === 0) return setErro('Selecione pelo menos um equipamento.');
 
     if (equipamentoIds.length === 1) {
-      addManutencao({ ...draft, equipamentoId: equipamentoIds[0], tipo: tipoManutencao });
+      addManutencao({ ...draft, equipamentoId: equipamentoIds[0], tipo: tipoManutencao === 'preventiva' ? draft.tipo : tipoManutencao });
     } else {
-      addManutencaoEmLote(equipamentoIds, { ...draft, tipo: tipoManutencao });
+      addManutencaoEmLote(equipamentoIds, { ...draft, tipo: tipoManutencao === 'preventiva' ? draft.tipo : tipoManutencao });
     }
 
     const tipoLabel = tipoManutencao === 'preventiva' ? 'Preventiva' : 'Corretiva';
@@ -52,6 +69,29 @@ export default function ManutencaoCorretiva() {
     setErro('');
     setOk(`Manutenção ${tipoLabel} registrada para ${equipamentoIds.length} equipamento(s).`);
     setEquipamentoIds([]);
+  };
+
+  const salvarNota = () => {
+    if (!numeroNota.trim()) return setErroNota('Informe o número da nota fiscal.');
+    if (!prestadorNota) return setErroNota('Selecione o prestador da nota fiscal.');
+    if (itensNota.length === 0 || itensNota.some((item) => !item.equipamentoId || toNumber(item.custoIndividual) <= 0)) {
+      return setErroNota('Cada linha precisa de uma máquina e um custo maior que zero.');
+    }
+    addNotaFiscalLote({
+      id: novoId(),
+      numero: numeroNota.trim(),
+      tipo: tipoNota,
+      prestadorId: prestadorNota,
+      data: dataNota,
+      valorTotal: totalNota,
+      itens: itensNota,
+    });
+    setNumeroNota('');
+    setPrestadorNota('');
+    setItensNota([novaLinhaNota()]);
+    setErro('');
+    setErroNota('');
+    setSucessoNota(`Nota ${numeroNota.trim()} registrada. Total: ${formatBRL(totalNota)}.`);
   };
 
   return (
@@ -172,6 +212,75 @@ export default function ManutencaoCorretiva() {
 					</div>
 				</div>
 			</Card>
+
+      <Card>
+        <CardHeader
+          icon={<Save size={18} />}
+          title="Cadastrar nota fiscal por máquina"
+          subtitle="Adicione uma linha para cada serviço. A mesma máquina pode aparecer mais de uma vez com tipos e custos diferentes."
+        />
+        <div className="flex flex-col gap-5 p-5">
+          <div className="grid grid-cols-1 gap-3 md:grid-cols-4">
+            <Field label="Número da nota" required>
+              <Input value={numeroNota} onChange={(event) => setNumeroNota(event.target.value)} />
+            </Field>
+            <Field label="Tipo de nota">
+              <Select value={tipoNota} onChange={(event) => setTipoNota(event.target.value as TipoNota | '')}>
+                {TIPOS_NOTA.map((tipo) => <option key={tipo} value={tipo}>{tipo}</option>)}
+              </Select>
+            </Field>
+            <Field label="Prestador" required>
+              <Select value={prestadorNota} onChange={(event) => setPrestadorNota(event.target.value)}>
+                <option value="">Selecione...</option>
+                {prestadores.map((prestador) => <option key={prestador.id} value={prestador.id}>{prestador.nome}</option>)}
+              </Select>
+            </Field>
+            <Field label="Data da nota">
+              <Input type="date" value={dataNota} onChange={(event) => setDataNota(event.target.value)} />
+            </Field>
+          </div>
+
+          <div className="flex flex-col gap-3">
+            <div className="flex items-center justify-between gap-3">
+              <h3 className="text-sm font-bold">Serviços e máquinas</h3>
+              <Button type="button" variant="outline" onClick={() => setItensNota((items) => [...items, novaLinhaNota()])}>
+                <Plus size={15} /> Adicionar máquina
+              </Button>
+            </div>
+            {!loja && <p className="text-sm text-muted-foreground">Selecione a loja no formulário acima para listar as máquinas disponíveis.</p>}
+            {itensNota.map((item, index) => (
+              <div key={item.id} className="grid grid-cols-1 items-end gap-3 rounded-lg border border-border p-3 md:grid-cols-[1fr_1fr_180px_auto]">
+                <Field label={`Máquina ${index + 1}`} required>
+                  <Select value={item.equipamentoId} onChange={(event) => setItensNota((items) => items.map((row) => row.id === item.id ? { ...row, equipamentoId: event.target.value } : row))}>
+                    <option value="">Selecione...</option>
+                    {equipamentos.map((equipamento) => <option key={equipamento.id} value={equipamento.id}>{equipamento.tag} · {equipamento.local}</option>)}
+                  </Select>
+                </Field>
+                <Field label="Tipo de manutenção" required>
+                  <Select value={item.tipoManutencao} onChange={(event) => setItensNota((items) => items.map((row) => row.id === item.id ? { ...row, tipoManutencao: event.target.value as TipoManutencaoItem } : row))}>
+                    <option value="Preventiva Semestral">Preventiva semestral</option>
+                    <option value="Preventiva Trimestral">Preventiva trimestral</option>
+                    <option value="Corretiva">Corretiva</option>
+                  </Select>
+                </Field>
+                <Field label="Custo individual (R$)" required>
+                  <Input inputMode="decimal" value={String(item.custoIndividual)} onChange={(event) => setItensNota((items) => items.map((row) => row.id === item.id ? { ...row, custoIndividual: event.target.value } : row))} placeholder="0,00" />
+                </Field>
+                <Button type="button" variant="ghost" className="text-red-600" disabled={itensNota.length === 1} onClick={() => setItensNota((items) => items.filter((row) => row.id !== item.id))} aria-label={`Remover máquina ${index + 1}`}>
+                  <Trash2 size={16} />
+                </Button>
+              </div>
+            ))}
+          </div>
+
+          <div className="flex flex-wrap items-center justify-between gap-3 border-t border-border pt-4">
+            <div><span className="text-sm text-muted-foreground">Total automático da nota</span><strong className="ml-3 text-lg">{formatBRL(totalNota)}</strong></div>
+            <Button onClick={salvarNota}><Save size={16} /> Registrar nota fiscal</Button>
+          </div>
+          {erroNota && <p role="alert" className="rounded-lg bg-red-50 px-3 py-2 text-sm text-red-700">{erroNota}</p>}
+          {sucessoNota && <p className="rounded-lg bg-green-50 px-3 py-2 text-sm text-green-800">{sucessoNota}</p>}
+        </div>
+      </Card>
 
 			{equipamentoIds.length === 1 && historico.length > 0 &&
       <Card>

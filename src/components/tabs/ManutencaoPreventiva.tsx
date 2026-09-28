@@ -19,8 +19,10 @@ import ManutencaoForm from '@/components/ManutencaoForm';
 import ManutencaoCard from '@/components/ManutencaoCard';
 import { useAcm } from '@/hooks/use-acm';
 import { formatBRL, formatData } from '@/lib/format';
-import { lojaNome } from '@/lib/constants';
+import { LOJAS, lojaNome } from '@/lib/constants';
 import {
+  cronogramaPreventiva,
+  ehPreventiva,
   manutencaoVazia,
   proximaPreventiva,
   preventivaAtrasada,
@@ -39,11 +41,22 @@ export default function ManutencaoPreventiva({ lojaInicial }: { lojaInicial?: st
   const [novaManutencao, setNovaManutencao] = useState<ManutencaoDraft | null>(null);
 
   const listaEquipamentos = loja ? equipamentosDaLoja(loja) : [];
+  const lojasComPreventivaNoMes = LOJAS.flatMap((lojaInfo) => {
+    const hoje = new Date();
+    const equipamentosDevidos = equipamentosDaLoja(lojaInfo.cnpj).flatMap((equipamento) => {
+      const cronograma = cronogramaPreventiva(manutencoesDoEquipamento(equipamento.id));
+      if (!cronograma || cronograma.dataProxima.getFullYear() !== hoje.getFullYear() || cronograma.dataProxima.getMonth() !== hoje.getMonth()) return [];
+      return [{ equipamento, cronograma }];
+    });
+    if (equipamentosDevidos.length === 0) return [];
+    equipamentosDevidos.sort((a, b) => a.cronograma.dataProxima.getTime() - b.cronograma.dataProxima.getTime());
+    return [{ loja: lojaInfo, cronograma: equipamentosDevidos[0].cronograma, equipamentos: equipamentosDevidos.map(({ equipamento }) => equipamento) }];
+  });
 
   // Mapeia o estado de preventiva de cada equipamento da loja
   const equipamentosComPreventiva = listaEquipamentos.map((eq) => {
     const manutencoes = manutencoesDoEquipamento(eq.id);
-    const preventivas = manutencoes.filter((m) => m.tipo === 'preventiva');
+    const preventivas = manutencoes.filter((m) => ehPreventiva(String(m.tipo)));
     const proxima = proximaPreventiva(manutencoes);
     const atrasada = preventivaAtrasada(manutencoes);
 
@@ -122,6 +135,26 @@ export default function ManutencaoPreventiva({ lojaInicial }: { lojaInicial?: st
         </div>
       </Card>
 
+      <Card>
+        <CardHeader
+          icon={<Calendar className="text-amber-600" size={18} />}
+          title="Lojas com preventiva neste mês"
+          subtitle="Agenda calculada pela última preventiva registrada e sua periodicidade."
+        />
+        <div className="grid grid-cols-1 gap-3 p-5 md:grid-cols-2">
+          {lojasComPreventivaNoMes.length === 0 ? (
+            <p className="text-sm text-muted-foreground">Nenhuma loja tem preventiva prevista para este mês.</p>
+          ) : lojasComPreventivaNoMes.map(({ loja: lojaInfo, cronograma, equipamentos }) => (
+            <button key={lojaInfo.cnpj} type="button" onClick={() => setLoja(lojaInfo.cnpj)} className="rounded-lg border border-amber-200 bg-amber-50 p-4 text-left hover:bg-amber-100">
+              <strong className="text-sm text-gray-900">{lojaInfo.nome}</strong>
+              <span className="mt-1 block text-xs text-gray-600">{equipamentos.length} equipamento(s) previsto(s): {equipamentos.map((equipamento) => equipamento.tag).join(', ')}</span>
+              <span className="mt-2 block text-xs text-gray-700">Última manutenção preventiva: {cronograma.ultima.tipo} · {formatData(cronograma.ultima.data)}</span>
+              <span className="mt-1 block text-xs font-semibold text-amber-900">Próxima manutenção preventiva: {cronograma.tipoProxima} · {formatData(cronograma.dataProxima.toISOString())}</span>
+            </button>
+          ))}
+        </div>
+      </Card>
+
       {loja && (
         <>
           {/* Dashboard de Indicadores de Preventiva */}
@@ -155,7 +188,7 @@ export default function ManutencaoPreventiva({ lojaInicial }: { lojaInicial?: st
           <Card>
             <CardHeader
               title={`Plano de Preventivas · ${lojaNome(loja)}`}
-              subtitle="Status das revisões periódicas programadas a cada 90 dias"
+              subtitle="Status das revisões conforme a periodicidade preventiva registrada"
               action={
                 <div className="flex flex-row items-center gap-1.5 bg-muted p-1 rounded-lg">
                   <Button

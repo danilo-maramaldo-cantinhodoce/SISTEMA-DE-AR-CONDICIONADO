@@ -3,7 +3,7 @@ import { FileText, Pencil, Save, Trash2, X, Wrench, Shield, Calendar } from 'luc
 import { Badge, Button } from '@/components/ui';
 import { statusTone } from '@/lib/ui-helpers';
 import ManutencaoForm from '@/components/ManutencaoForm';
-import { totalNotasManutencao, totalIndividualManutencao, type ManutencaoDraft } from '@/lib/drafts';
+import { ehPreventiva, totalNotasManutencao, totalIndividualManutencao, type ManutencaoDraft } from '@/lib/drafts';
 import { useAcm } from '@/hooks/use-acm';
 import { formatBRL, formatData, toNumber } from '@/lib/format';
 import type { Manutencao } from '@/lib/types';
@@ -24,9 +24,10 @@ export default function ManutencaoCard({ manutencao }: {manutencao: Manutencao;}
     setEditando(false);
   };
 
-  const tipoIcon = manutencao.tipo === 'preventiva' ? <Shield size={12} /> : <Wrench size={12} />;
-  const tipoLabel = manutencao.tipo === 'preventiva' ? 'Preventiva' : 'Corretiva';
-  const tipoTone = manutencao.tipo === 'preventiva' ? 'purple' : 'neutral';
+	const preventiva = ehPreventiva(String(manutencao.tipo));
+	const tipoIcon = preventiva ? <Shield size={12} /> : <Wrench size={12} />;
+	const tipoLabel = preventiva ? String(manutencao.tipo) : 'Corretiva';
+	const tipoTone = preventiva ? 'purple' : 'neutral';
 
   if (editando) {
     return (
@@ -73,7 +74,7 @@ export default function ManutencaoCard({ manutencao }: {manutencao: Manutencao;}
 			</div>
 
 			<div data-ev-id="ev_8d97a34fb3" className="grid grid-cols-1 gap-3 md:grid-cols-2">
-				{manutencao.tipo === 'corretiva' && manutencao.problemaAtestado &&
+				{!preventiva && manutencao.problemaAtestado &&
         <div data-ev-id="ev_902088b61c" className="flex flex-col gap-1">
 						<span data-ev-id="ev_78a9997095" className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Problema atestado</span>
 						<p data-ev-id="ev_1876861a80" className="whitespace-pre-wrap text-sm text-gray-800">{manutencao.problemaAtestado}</p>
@@ -82,7 +83,7 @@ export default function ManutencaoCard({ manutencao }: {manutencao: Manutencao;}
 				{manutencao.solucao &&
         <div data-ev-id="ev_3a0572a362" className="flex flex-col gap-1">
 						<span data-ev-id="ev_c29b685136" className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-							{manutencao.tipo === 'preventiva' ? 'Serviços realizados' : 'Serviço executado / solução'}
+							{preventiva ? 'Serviços realizados' : 'Serviço executado / solução'}
 						</span>
 						<p data-ev-id="ev_192421d077" className="whitespace-pre-wrap text-sm text-gray-800">{manutencao.solucao}</p>
 					</div>
