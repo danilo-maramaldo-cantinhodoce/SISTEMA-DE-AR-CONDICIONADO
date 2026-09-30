@@ -42,3 +42,64 @@ ALTERA A ABA DE IMPORTAÇÃO DE DADOS. DEVE SER UMA MESMA PLANILHA EM EXCEL PARA
 
 
 Altera a forma de armazenamento de dados. atualmente está no localstorage, quero colocar para o supabase.
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+ALTERAÇÕES 29/09/2026
+
+Na tela de cadastro de equipamentos deve ter a na parte de equipamentos registrados um opção de ocultar a lista de máquinas e de editar o cadastro de cada uma delas.
+
+Formata a parte da tag do equipamento para sempre ter essa estrutura EQ 10 (o EQ já fica fixo e acrescentamos somete o número sendo que 01 fica 01 e 1 transfoma-se em 01)
+
+na parte de cadastro de modelo deve ser dois: inverter, convencional, splitão
+
+potencia adiciona mais um de 90 mil btus, e um de 24 TR
+
+tipo de equipamento deve ter somente piso teto, hi wall, cassete, vrf,
+
+Todo e qualquer tipo de exclusão deve pedir confimação para não haver exclusões acidentais.
+
+toda a formatação dos campos do sistema deve ser em caixa alta
+
+adiciona também na aba de terceirizado/prestador a função de ocutar a lista de fonecedores
+
+
+Na aba de Histórico, ao lado de cada cadastro das máquinas, remove o valor de prev. R$ e ao lado de corr. R$ coloca também a quantidade de corretivas realizadas naquela máquina.
+
+ainda na aba de Histórico coloca nos cards as seguintes informações: Equipamentos, remove o custo preventiva, parmanece o custo corretiva, permanece a quantidade de corretivas, aqui deve ter a data da última preventiva feita e o tipo se foi trimestral ou semestral (vou alterar o modo de cadastro das preventivas. Vai ser de modo geral sem especificar cada máquina. Vou mencionar ela quando chegar na parte de cadstro de manutenções preventivas e corretivas)
+
+
+as preventivas são feitas de 3 em 3 meses alternando entre trimestral e semestral 
+
+remove esse card de Próxima preventiva que está em roxo e eem baixo tem data prevista ...
+
+na parte de histórico completo da aba histórico, remove a parte de preventivas. deixa somente as corretivas com as seguintes informações: data, valor, o que foi feito, quem fez, o número da nota. 
+
+Linha do tempo permanece
+
+
+Na aba de Manutenções corretivas
+Altera o nome para Manutenções Corretiva/preventivas
+Quero mudar completamente a forma como ela funciona. 
+
+vamos dividir em duas partes
+1. O cadastro de manutenções preventivas
+deve ter as informações de:
+data, tipo (semestral ou trimestral)
+
+
+2. o cadastro de manutenções corretivas
