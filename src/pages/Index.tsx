@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { AirVent, Briefcase, FileSpreadsheet, History, LogOut, Shield, Snowflake, Wrench } from 'lucide-react';
+import { AirVent, Briefcase, FileSpreadsheet, History, Shield, Snowflake, Wrench } from 'lucide-react';
 import CadastroEquipamento from '@/components/tabs/CadastroEquipamento';
 import CadastroPrestador from '@/components/tabs/CadastroPrestador';
 import Historico from '@/components/tabs/Historico';
@@ -21,7 +21,7 @@ const TABS: { id: TabId; label: string; icon: typeof AirVent }[] = [
 ];
 
 export default function Index() {
-  const { equipamentos, prestadores, manutencoes, cloudStatus, signOut } = useAcm();
+  const { equipamentos, prestadores, manutencoes } = useAcm();
   const [tab, setTab] = useState<TabId>('equipamento');
   const [lojaFoco, setLojaFoco] = useState('');
   const [equipFoco, setEquipFoco] = useState('');
@@ -59,11 +59,6 @@ export default function Index() {
               <span data-ev-id="ev_de4d05cd2e" className="text-lg font-bold text-purple-900 flex items-center gap-1"><Shield size={14} /> {preventivas}</span>
               <span data-ev-id="ev_ea203a3e1a" className="text-xs text-purple-700">Preventivas</span>
             </div>
-            {cloudStatus === 'ready' && (
-              <button type="button" title="Sair da conta" aria-label="Sair da conta" onClick={() => void signOut()} className="flex items-center justify-center rounded-lg border border-border px-3 py-2 text-gray-600 hover:bg-muted">
-                <LogOut size={18} />
-              </button>
-            )}
           </div>
         </div>
       </header>

@@ -1,12 +1,12 @@
-import { useCallback, useEffect, useMemo, useState, type ReactNode } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { AcmContext, emptyState, STORAGE_KEY, type Persisted, type StoreValue } from '@/context/acm-context';
 import type { Equipamento, Manutencao, Prestador, TipoEvento, TipoManutencao, NotaFiscalLote, LinhaImportacaoPlanilha } from '@/lib/types';
 import { LOJAS, TIPOS_EQUIPAMENTO } from '@/lib/constants';
 import { calcularVidaUtil, formatarTagEquipamento, novoId, toNumber } from '@/lib/format';
 import { supabase, supabaseConfigured } from '@/lib/supabase';
-import SupabaseAuth from '@/components/SupabaseAuth';
 
 const OLD_KEY = 'gestao-ar-condicionado-v1';
+const SHARED_STATE_ID = 1;
 
 function isTipoPreventiva(tipo: string): boolean {
   if (!tipo) return false;
@@ -14,156 +14,139 @@ function isTipoPreventiva(tipo: string): boolean {
   return t.includes('preventiva');
 }
 
-function load(): Persisted {
-  try {
-    const raw = localStorage.getItem(STORAGE_KEY);
-    
-    if (!raw) {
-      const oldRaw = localStorage.getItem(OLD_KEY);
-      if (oldRaw) {
-        const oldData = JSON.parse(oldRaw) as Partial<Persisted>;
-        const manutencoes = (oldData.manutencoes ?? []).map((m) => ({
-          ...m,
-          tipo: (m as Manutencao).tipo || 'corretiva',
-          servicos: ((m as Manutencao).servicos ?? []).map((s) => ({
-            ...s,
-            valorIndividual: s.valorIndividual || s.notaValor || '',
-          })),
-        })) as Manutencao[];
-        
-        const migrated: Persisted = {
-          equipamentos: (oldData.equipamentos ?? []).map(e => ({
-            ...e,
-            tag: e.tag ? formatarTagEquipamento(e.tag) : '',
-            status: e.dataDesativacao || String(e.status) === 'Desativado' ? 'Desativada' : (String(e.status) === 'Em operação' ? 'Em Operação' : e.status || 'Em Operação')
-          })),
-          prestadores: oldData.prestadores ?? [],
-          manutencoes,
-          eventos: oldData.eventos ?? [],
-        };
-        localStorage.setItem(STORAGE_KEY, JSON.stringify(migrated));
-        return migrated;
-      }
-      return emptyState;
-    }
-    
-    const parsed = JSON.parse(raw) as Partial<Persisted>;
-    return {
-      equipamentos: (parsed.equipamentos ?? []).map(e => ({
-        ...e,
-        tag: e.tag ? formatarTagEquipamento(e.tag) : '',
-        status: e.dataDesativacao || String(e.status) === 'Desativado' || e.status === 'Desativada' ? 'Desativada' : 'Em Operação'
-      })),
-      prestadores: parsed.prestadores ?? [],
-      manutencoes: parsed.manutencoes ?? [],
-      eventos: parsed.eventos ?? [],
-    };
-  } catch {
-    return emptyState;
-  }
+function normalizeState(data: Partial<Persisted>): Persisted {
+  return {
+    equipamentos: (data.equipamentos ?? []).map((equipamento) => ({
+      ...equipamento,
+      tag: equipamento.tag ? formatarTagEquipamento(equipamento.tag) : '',
+      status: equipamento.dataDesativacao || String(equipamento.status) === 'Desativado' || equipamento.status === 'Desativada'
+        ? 'Desativada'
+        : 'Em Operação',
+    })),
+    prestadores: data.prestadores ?? [],
+    manutencoes: data.manutencoes ?? [],
+    eventos: data.eventos ?? [],
+  };
+}
+
+function loadLocalMigration(): Persisted {
+  const raw = localStorage.getItem(STORAGE_KEY) ?? localStorage.getItem(OLD_KEY);
+  if (!raw) return emptyState;
+
+  const parsed = JSON.parse(raw) as Partial<Persisted>;
+  const manutencoes = (parsed.manutencoes ?? []).map((manutencao) => ({
+    ...manutencao,
+    tipo: (manutencao as Manutencao).tipo || 'corretiva',
+    servicos: ((manutencao as Manutencao).servicos ?? []).map((servico) => ({
+      ...servico,
+      valorIndividual: servico.valorIndividual || servico.notaValor || '',
+    })),
+  })) as Manutencao[];
+
+  return normalizeState({ ...parsed, manutencoes });
+}
+
+function hasData(data: Persisted): boolean {
+  return data.equipamentos.length > 0
+    || data.prestadores.length > 0
+    || data.manutencoes.length > 0
+    || data.eventos.length > 0;
+}
+
+function errorMessage(error: unknown): string {
+  return error instanceof Error ? error.message : 'Erro inesperado ao conectar ao Supabase.';
+}
+
+function CloudStatus({ loading, error }: { loading: boolean; error: string }) {
+  return (
+    <main className="flex min-h-screen items-center justify-center bg-slate-50 p-4">
+      <div className="w-full max-w-lg rounded-xl border border-slate-200 bg-white p-6 text-center shadow-sm">
+        <h1 className="text-lg font-semibold text-slate-900">
+          {loading ? 'Conectando ao banco de dados' : 'Não foi possível conectar ao Supabase'}
+        </h1>
+        <p role={loading ? undefined : 'alert'} className="mt-2 text-sm text-slate-600">
+          {loading ? 'Carregando os dados salvos na nuvem...' : error}
+        </p>
+      </div>
+    </main>
+  );
 }
 
 export function AcmStoreProvider({ children }: { children: ReactNode }) {
-  const [state, setState] = useState<Persisted>(() => load());
-  const [cloudStatus, setCloudStatus] = useState<StoreValue['cloudStatus']>(supabaseConfigured ? 'loading' : 'disabled');
-  const [cloudError, setCloudError] = useState('');
-  const [cloudUserId, setCloudUserId] = useState<string | null>(null);
-
-  const carregarDadosDaNuvem = useCallback(async (userId: string) => {
-    if (!supabase) return;
-    setCloudStatus('loading');
-    setCloudError('');
-    const { data, error } = await supabase.from('acm_state').select('payload').eq('user_id', userId).maybeSingle();
-    if (error) {
-      setCloudError(error.message);
-      setCloudStatus('error');
-      return;
-    }
-    if (data?.payload) {
-      const remoto = data.payload as Partial<Persisted>;
-      setState({
-        equipamentos: (remoto.equipamentos ?? []).map((equipamento) => ({
-          ...equipamento,
-          tag: equipamento.tag ? formatarTagEquipamento(equipamento.tag) : '',
-        })),
-        prestadores: remoto.prestadores ?? [],
-        manutencoes: remoto.manutencoes ?? [],
-        eventos: remoto.eventos ?? [],
-      });
-    }
-    setCloudUserId(userId);
-    setCloudStatus('ready');
-  }, []);
+  const [state, setState] = useState<Persisted>(emptyState);
+  const [cloudStatus, setCloudStatus] = useState<StoreValue['cloudStatus']>(supabaseConfigured ? 'loading' : 'error');
+  const [cloudError, setCloudError] = useState(supabaseConfigured ? '' : 'Configure VITE_SUPABASE_URL e VITE_SUPABASE_ANON_KEY para iniciar o sistema.');
+  const cloudReady = useRef(false);
 
   useEffect(() => {
-    if (!supabase) return;
     let ativo = true;
-    supabase.auth.getSession().then(({ data, error }) => {
-      if (!ativo) return;
-      if (error) {
-        setCloudError(error.message);
-        setCloudStatus('error');
-      } else if (data.session) {
-        void carregarDadosDaNuvem(data.session.user.id);
-      } else {
-        setCloudStatus('auth');
+
+    const conectar = async () => {
+      if (!supabase) return;
+      try {
+        const [equipamentos, prestadores, manutencoes, eventos, estadoLegado] = await Promise.all([
+          supabase.from('acm_equipamentos').select('payload'),
+          supabase.from('acm_prestadores').select('payload'),
+          supabase.from('acm_manutencoes').select('payload'),
+          supabase.from('acm_eventos').select('payload'),
+          supabase.from('acm_shared_state').select('payload').eq('id', SHARED_STATE_ID).maybeSingle(),
+        ]);
+        const erroLeitura = equipamentos.error ?? prestadores.error ?? manutencoes.error ?? eventos.error ?? estadoLegado.error;
+        if (erroLeitura) throw new Error(erroLeitura.message);
+
+        const remoto = normalizeState({
+          equipamentos: (equipamentos.data ?? []).map((registro) => registro.payload as Equipamento),
+          prestadores: (prestadores.data ?? []).map((registro) => registro.payload as Prestador),
+          manutencoes: (manutencoes.data ?? []).map((registro) => registro.payload as Manutencao),
+          eventos: (eventos.data ?? []).map((registro) => registro.payload as Persisted['eventos'][number]),
+        });
+        const legado = estadoLegado.data?.payload
+          ? normalizeState(estadoLegado.data.payload as Partial<Persisted>)
+          : emptyState;
+        const local = hasData(remoto) || hasData(legado) ? emptyState : loadLocalMigration();
+        const inicial = hasData(remoto) ? remoto : hasData(legado) ? legado : local;
+
+        if (!hasData(remoto) && (hasData(legado) || hasData(local))) {
+          const { error: migrationError } = await supabase.rpc('sync_acm_data', { p_payload: inicial });
+          if (migrationError) throw new Error(`Falha ao migrar os dados para as tabelas do Supabase: ${migrationError.message}`);
+        }
+        if (ativo) setState(inicial);
+
+        localStorage.removeItem(STORAGE_KEY);
+        localStorage.removeItem(OLD_KEY);
+        if (ativo) {
+          cloudReady.current = true;
+          setCloudError('');
+          setCloudStatus('ready');
+        }
+      } catch (error) {
+        if (ativo) {
+          setCloudError(errorMessage(error));
+          setCloudStatus('error');
+        }
       }
-    });
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
-      if (!ativo) return;
-      if (event === 'SIGNED_IN' && session) {
-        void carregarDadosDaNuvem(session.user.id);
-      } else if (event === 'SIGNED_OUT') {
-        setCloudUserId(null);
-        setCloudStatus('auth');
-      }
-    });
+    };
+
+    void conectar();
     return () => {
       ativo = false;
-      subscription.unsubscribe();
     };
-  }, [carregarDadosDaNuvem]);
-
-  const signIn: StoreValue['signIn'] = useCallback(async (email, password) => {
-    if (!supabase) return 'Supabase não configurado.';
-    const { error } = await supabase.auth.signInWithPassword({ email, password });
-    return error?.message ?? null;
-  }, []);
-
-  const signUp: StoreValue['signUp'] = useCallback(async (email, password) => {
-    if (!supabase) return 'Supabase não configurado.';
-    const { error, data } = await supabase.auth.signUp({ email, password });
-    if (error) return error.message;
-    if (!data.session) return 'Conta criada. Confirme seu e-mail e depois entre no sistema.';
-    return 'Conta criada e conectada.';
-  }, []);
-
-  const signOut: StoreValue['signOut'] = useCallback(async () => {
-    if (supabase) await supabase.auth.signOut();
   }, []);
 
   useEffect(() => {
-    try {
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
-    } catch {
-      /* storage indisponível */
-    }
-  }, [state]);
-
-  useEffect(() => {
-    if (!supabase || cloudStatus !== 'ready' || !cloudUserId) return;
+    const client = supabase;
+    if (!client || !cloudReady.current || cloudStatus !== 'ready') return;
     const timeout = window.setTimeout(async () => {
-      if (!supabase) return;
-      const { error } = await supabase.from('acm_state').upsert({
-        user_id: cloudUserId,
-        payload: state,
-        updated_at: new Date().toISOString(),
-      });
-      if (error) setCloudError(`Falha ao salvar na nuvem: ${error.message}`);
-      else setCloudError('');
+      try {
+        const { error } = await client.rpc('sync_acm_data', { p_payload: state });
+        if (error) throw new Error(error.message);
+        setCloudError('');
+      } catch (error) {
+        setCloudError(`Falha ao salvar no Supabase: ${errorMessage(error)}`);
+      }
     }, 500);
     return () => window.clearTimeout(timeout);
-  }, [state, cloudStatus, cloudUserId]);
+  }, [state, cloudStatus]);
 
   const log = useCallback((equipamentoId: string, tipo: TipoEvento, descricao: string, detalhe = '') => {
     setState((prev) => ({
@@ -508,9 +491,6 @@ export function AcmStoreProvider({ children }: { children: ReactNode }) {
       ...state,
       cloudStatus,
       cloudError,
-      signIn,
-      signUp,
-      signOut,
       addEquipamento,
       updateEquipamento,
       removeEquipamento,
@@ -538,9 +518,6 @@ export function AcmStoreProvider({ children }: { children: ReactNode }) {
     state,
     cloudStatus,
     cloudError,
-    signIn,
-    signUp,
-    signOut,
     addEquipamento,
     updateEquipamento,
     removeEquipamento,
@@ -557,8 +534,8 @@ export function AcmStoreProvider({ children }: { children: ReactNode }) {
 
   return (
     <AcmContext.Provider value={value}>
-      {cloudStatus !== 'disabled' && cloudStatus !== 'ready' ? (
-        <SupabaseAuth status={cloudStatus === 'loading' ? 'loading' : cloudStatus === 'error' ? 'error' : 'auth'} error={cloudError} onSignIn={signIn} onSignUp={signUp} />
+      {cloudStatus !== 'ready' ? (
+        <CloudStatus loading={cloudStatus === 'loading'} error={cloudError} />
       ) : (
         <>
           {cloudError && <p role="alert" className="bg-red-50 px-4 py-2 text-sm text-red-800">{cloudError}</p>}
