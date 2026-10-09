@@ -185,7 +185,11 @@ export default function ManutencaoForm({
                 type="button"
                 variant="ghost"
                 className="px-2 text-destructive"
-                onClick={() => onChange({ servicos: (draft.servicos ?? []).filter((x) => x.id !== s.id) })}
+                onClick={() => {
+                  if (window.confirm('Confirma a exclusão deste item de serviço/nota?')) {
+                    onChange({ servicos: (draft.servicos ?? []).filter((x) => x.id !== s.id) });
+                  }
+                }}
               >
                 <Trash2 size={16} /> Remover
               </Button>

@@ -97,7 +97,9 @@ export interface ServicoItem {
 
 export interface Manutencao {
   id: string;
+  /** Vazio para preventivas registradas uma única vez para toda a loja. */
   equipamentoId: string;
+  lojaCnpj?: string;
   tipo: TipoManutencao | TipoManutencaoItem;
   data: string;
   problemaAtestado: string;
@@ -105,6 +107,10 @@ export interface Manutencao {
   status: StatusManutencao;
   servicos: ServicoItem[];
   custo?: number;
+  valorGlobal?: number | string;
+  valorEquipamento?: number | string;
+  numeroNota?: string;
+  prestadorId?: string;
   notaFiscalId?: string;
   observacoes: string;
   criadoEm: string;

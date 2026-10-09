@@ -1,5 +1,5 @@
 import { useState, type ButtonHTMLAttributes, type HTMLAttributes, type ReactNode } from 'react';
-import { AirVent, Save, RotateCcw, CheckCircle2, AlertCircle, ListFilter } from 'lucide-react';
+import { AirVent, Save, RotateCcw, CheckCircle2, AlertCircle, ListFilter, Eye, EyeOff, Pencil, X } from 'lucide-react';
 import EquipamentoFields from '@/components/EquipamentoFields';
 import { draftVazio, type EquipamentoDraft } from '@/lib/drafts';
 import { useAcm } from '@/hooks/use-acm';
@@ -43,8 +43,11 @@ function CardHeader({ icon, title, subtitle }: { icon: ReactNode; title: string;
 }
 
 export default function CadastroEquipamento({ onCadastrado }: { onCadastrado: (lojaCnpj: string, equipamentoId: string) => void; }) {
-  const { addEquipamento, equipamentos = [] } = useAcm();
+  const { addEquipamento, updateEquipamento, equipamentos = [] } = useAcm();
   const [draft, setDraft] = useState<EquipamentoDraft>(draftVazio());
+  const [draftEdicao, setDraftEdicao] = useState<EquipamentoDraft | null>(null);
+  const [equipamentoEditando, setEquipamentoEditando] = useState<string | null>(null);
+  const [mostrarLista, setMostrarLista] = useState(true);
   const [erro, setErro] = useState('');
   const [ok, setOk] = useState('');
 
@@ -56,7 +59,7 @@ export default function CadastroEquipamento({ onCadastrado }: { onCadastrado: (l
 
   const salvar = () => {
     if (!draft.lojaCnpj) return setErro('Selecione a loja.');
-    if (!draft.tag.trim()) return setErro('Informe a tag do equipamento (ex.: EQ. 01).');
+    if (!draft.tag.replace(/\D/g, '').trim()) return setErro('Informe o número da tag do equipamento (ex.: 01).');
     if (!draft.local.trim()) return setErro('Informe o local do equipamento.');
     if (!draft.marca) return setErro('Selecione a marca.');
     if (!draft.potencia) return setErro('Selecione a potência (BTUs).');
@@ -65,6 +68,19 @@ export default function CadastroEquipamento({ onCadastrado }: { onCadastrado: (l
     setOk(`${novo.tag} cadastrado com sucesso e enviado para o Histórico.`);
     setDraft(draftVazio());
     onCadastrado(novo.lojaCnpj, novo.id);
+  };
+
+  const iniciarEdicao = (eq: (typeof equipamentos)[number]) => {
+    const { id: _id, criadoEm: _criadoEm, atualizadoEm: _atualizadoEm, ...dados } = eq;
+    setEquipamentoEditando(eq.id);
+    setDraftEdicao(dados);
+  };
+
+  const salvarEdicao = () => {
+    if (!equipamentoEditando || !draftEdicao) return;
+    updateEquipamento(equipamentoEditando, draftEdicao);
+    setEquipamentoEditando(null);
+    setDraftEdicao(null);
   };
 
   // Filtra equipamentos para exibir na listagem (filtrando pela loja selecionada se houver)
@@ -118,7 +134,13 @@ export default function CadastroEquipamento({ onCadastrado }: { onCadastrado: (l
             title="Equipamentos Registrados"
             subtitle={draft.lojaCnpj ? "Exibindo equipamentos da loja selecionada" : "Exibindo todos os equipamentos"}
           />
-          <div className="p-5">
+          <div className="flex justify-end px-5 pt-4">
+            <Button variant="outline" onClick={() => setMostrarLista((visivel) => !visivel)}>
+              {mostrarLista ? <EyeOff size={16} /> : <Eye size={16} />}
+              {mostrarLista ? 'Ocultar lista' : 'Mostrar lista'}
+            </Button>
+          </div>
+          {mostrarLista && <div className="p-5">
             <div className="overflow-x-auto">
               <table className="w-full text-left text-sm text-slate-600">
                 <thead className="bg-slate-50 text-xs uppercase text-slate-500 border-b border-slate-200">
@@ -129,6 +151,7 @@ export default function CadastroEquipamento({ onCadastrado }: { onCadastrado: (l
                     <th className="px-4 py-3">Status</th>
                     <th className="px-4 py-3">Instalação</th>
                     <th className="px-4 py-3">Desativação / Vida Útil</th>
+                    <th className="px-4 py-3">Ação</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-200">
@@ -169,13 +192,32 @@ export default function CadastroEquipamento({ onCadastrado }: { onCadastrado: (l
                             <span className="text-slate-400">—</span>
                           )}
                         </td>
+                        <td className="px-4 py-3">
+                          <Button variant="outline" onClick={() => iniciarEdicao(eq)}>
+                            <Pencil size={14} /> Editar
+                          </Button>
+                        </td>
                       </tr>
                     );
                   })}
                 </tbody>
               </table>
             </div>
-          </div>
+            {draftEdicao && equipamentoEditando && (
+              <div className="mt-5 space-y-4 rounded-xl border-2 border-blue-200 bg-blue-50/30 p-4">
+                <h3 className="font-semibold text-slate-900">Editar cadastro do equipamento</h3>
+                <EquipamentoFields
+                  draft={draftEdicao}
+                  onChange={(patch) => setDraftEdicao((atual) => atual ? { ...atual, ...patch } : atual)}
+                  modoCompleto
+                />
+                <div className="flex gap-2">
+                  <Button onClick={salvarEdicao}><Save size={15} /> Salvar alterações</Button>
+                  <Button variant="outline" onClick={() => { setDraftEdicao(null); setEquipamentoEditando(null); }}><X size={15} /> Cancelar</Button>
+                </div>
+              </div>
+            )}
+          </div>}
         </Card>
       )}
     </div>

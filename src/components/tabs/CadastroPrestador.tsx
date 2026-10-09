@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Briefcase, Pencil, Save, Trash2, X } from 'lucide-react';
+import { Briefcase, Eye, EyeOff, Pencil, Save, Trash2, X } from 'lucide-react';
 import { Badge, Button, Card, CardHeader, EmptyState, Field, Input, TextArea } from '@/components/ui';
 import { useAcm } from '@/hooks/use-acm';
 import { detectTipoDocumento, formatDocumento, formatTelefone } from '@/lib/format';
@@ -14,6 +14,7 @@ export default function CadastroPrestador() {
   const [draft, setDraft] = useState<Draft>(vazio());
   const [editando, setEditando] = useState<string | null>(null);
   const [erro, setErro] = useState('');
+  const [mostrarLista, setMostrarLista] = useState(true);
 
   const tipo = detectTipoDocumento(draft.documento);
 
@@ -24,7 +25,16 @@ export default function CadastroPrestador() {
 
   const salvar = () => {
     if (!draft.nome.trim()) return setErro('Informe o nome do fornecedor / prestador de serviço.');
-    const payload: Draft = { ...draft, nome: draft.nome.trim(), tipoDocumento: tipo };
+    const payload: Draft = {
+      ...draft,
+      nome: draft.nome.trim().toLocaleUpperCase('pt-BR'),
+      razaoSocial: draft.razaoSocial.trim().toLocaleUpperCase('pt-BR'),
+      documento: draft.documento.toLocaleUpperCase('pt-BR'),
+      contato: draft.contato.toLocaleUpperCase('pt-BR'),
+      email: draft.email.trim().toLocaleUpperCase('pt-BR'),
+      observacoes: draft.observacoes.trim().toLocaleUpperCase('pt-BR'),
+      tipoDocumento: tipo,
+    };
     if (editando) updatePrestador(editando, payload);else
     addPrestador(payload);
     setDraft(vazio());
@@ -99,8 +109,12 @@ export default function CadastroPrestador() {
 			</Card>
 
 			<Card>
-				<CardHeader title="Prestadores cadastrados" subtitle={`${prestadores.length} registro(s)`} />
-				<div data-ev-id="ev_4eeaa6722c" className="p-5">
+				<CardHeader
+          title="Prestadores cadastrados"
+          subtitle={`${prestadores.length} registro(s)`}
+          action={<Button variant="outline" onClick={() => setMostrarLista((visivel) => !visivel)}>{mostrarLista ? <EyeOff size={15} /> : <Eye size={15} />}{mostrarLista ? 'Ocultar lista' : 'Mostrar lista'}</Button>}
+        />
+				{mostrarLista && <div data-ev-id="ev_4eeaa6722c" className="p-5">
 					{prestadores.length === 0 ?
           <EmptyState icon={<Briefcase size={28} />} title="Nenhum prestador cadastrado" description="Cadastre os fornecedores e terceirizados para vincular às notas fiscais das manutenções." /> :
 
@@ -131,7 +145,9 @@ export default function CadastroPrestador() {
 													<Button variant="ghost" className="px-2" onClick={() => editar(p)}>
 														<Pencil size={15} />
 													</Button>
-													<Button variant="ghost" className="px-2 text-destructive" onClick={() => removePrestador(p.id)}>
+													<Button variant="ghost" className="px-2 text-destructive" onClick={() => {
+                            if (window.confirm(`Confirma a exclusão do prestador ${p.nome}?`)) removePrestador(p.id);
+                          }}>
 														<Trash2 size={15} />
 													</Button>
 												</div>
@@ -142,7 +158,7 @@ export default function CadastroPrestador() {
 							</table>
 						</div>
           }
-				</div>
+				</div>}
 			</Card>
 		</div>);
 

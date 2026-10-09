@@ -59,7 +59,16 @@ Altera a forma de armazenamento de dados. atualmente está no localstorage, quer
 
 
 
-ALTERAÇÕES 29/09/2026
+
+
+
+
+
+
+
+
+
+ALTERAÇÕES 29/09/2026 - 09/10/206
 
 Na tela de cadastro de equipamentos deve ter a na parte de equipamentos registrados um opção de ocultar a lista de máquinas e de editar o cadastro de cada uma delas.
 
@@ -78,28 +87,57 @@ toda a formatação dos campos do sistema deve ser em caixa alta
 adiciona também na aba de terceirizado/prestador a função de ocutar a lista de fonecedores
 
 
-Na aba de Histórico, ao lado de cada cadastro das máquinas, remove o valor de prev. R$ e ao lado de corr. R$ coloca também a quantidade de corretivas realizadas naquela máquina.
+Na aba de Histórico, ao lado de cada cadastro das máquinas, remove o valor de "Prev. R$" e ao lado de "Corr. R$" coloca também a quantidade de corretivas realizadas naquela máquina.
 
-ainda na aba de Histórico coloca nos cards as seguintes informações: Equipamentos, remove o custo preventiva, parmanece o custo corretiva, permanece a quantidade de corretivas, aqui deve ter a data da última preventiva feita e o tipo se foi trimestral ou semestral (vou alterar o modo de cadastro das preventivas. Vai ser de modo geral sem especificar cada máquina. Vou mencionar ela quando chegar na parte de cadstro de manutenções preventivas e corretivas)
+ainda na aba de Histórico coloca nos cards as seguintes informações: Equipamentos, remove o custo preventiva, parmanece o custo corretiva, permanece a quantidade de corretivas, faz um card ao lado com a data da última preventiva feita e o tipo se foi trimestral ou semestral (vou alterar o modo de cadastro das preventivas. Vai ser de modo geral sem especificar cada máquina. Vou mencionar ela quando chegar na parte de cadstro de manutenções preventivas e corretivas)
 
 
 as preventivas são feitas de 3 em 3 meses alternando entre trimestral e semestral 
 
-remove esse card de Próxima preventiva que está em roxo e eem baixo tem data prevista ...
+remove esse card de "Próxima preventiva" que está em roxo e em baixo tem data prevista ...
 
-na parte de histórico completo da aba histórico, remove a parte de preventivas. deixa somente as corretivas com as seguintes informações: data, valor, o que foi feito, quem fez, o número da nota. 
+na parte de histórico completo da aba histórico, remove a parte de "Manutenções Preventivas". deixa somente as corretivas com as seguintes informações: data, valor, o que foi feito, quem fez, o número da nota. 
 
 Linha do tempo permanece
 
 
 Na aba de Manutenções corretivas
-Altera o nome para Manutenções Corretiva/preventivas
+Altera o nome para Manutenções Corretiva/Preventivas
 Quero mudar completamente a forma como ela funciona. 
 
 vamos dividir em duas partes
+
 1. O cadastro de manutenções preventivas
 deve ter as informações de:
-data, tipo (semestral ou trimestral)
+data, tipo (semestral ou trimestral), NF, valor, loja, observação, prestador de serviço
+
+vamos partir de que se for preventiva trimestral ou semestral sempre será feita em todas as máquinas(nem vamos colocar a inclusão de máquinas, não precisa)
+
 
 
 2. o cadastro de manutenções corretivas
+data, NF, valor global, valor da máquina em questão, loja, observação, prestador de serviço, a máquina EQ ?, 
+
+
+Na aba de Manutenções preventivas altera o nome para Cronograma de manutenção.
+vamos modificar completamente essa aba. Ela vai ficar somente com as datas das últimas manutenções preventivas realizadas e qual o tipo 
+
+EXEMPLO:
+COHAMA:
+ULTIMA MANUTENÇÃO PREVENTIVA:TRIMESTRAL DATA: 03/03/2026
+PRÓXIMA MANUTENÇÃO PREVENTIVA: SEMESTRAL DATA: 03/06/2026
+
+deve aparecer na tela sempre as que estão com vencimento para o mês atual. as informações serão puxadas do cadastro de manutenções preventivas.
+abaixo deve aparcer uma tabela da seguinte forma:
+
+COHAMA:
+ULTIMA MANUTENÇÃO PREVENTIVA:TRIMESTRAL DATA: 03/03/2026
+PRÓXIMA MANUTENÇÃO PREVENTIVA: SEMESTRAL DATA: 03/06/2026
+
+isso para todas as lojas
+
+na aba de importação de dados, coloca somente o cadatros das máuqinas mesmo, remove aquela outra parte. 
+
+
+me ajuda a configurar/conectar o supabase para receber esses dados
+

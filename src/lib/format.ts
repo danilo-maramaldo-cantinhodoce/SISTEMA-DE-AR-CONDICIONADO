@@ -78,3 +78,9 @@ export function calcularVidaUtil(dataInstalacao: string, dataDesativacao: string
 export const hoje = () => new Date().toISOString().slice(0, 10);
 
 export const novoId = () => `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`;
+
+/** Produz a tag padrão EQ NN a partir do número informado ou de uma tag antiga. */
+export function formatarTagEquipamento(value: string): string {
+	const numero = (value ?? '').replace(/^eq\s*\.?\s*/i, '').replace(/\D/g, '');
+	return `EQ ${numero.padStart(2, '0')}`;
+}

@@ -1,9 +1,10 @@
 import { Field, Input, Select, TextArea } from '@/components/ui';
 import LojaSelect from '@/components/LojaSelect';
-import { GASES, MARCAS, POTENCIAS, STATUS_EQUIPAMENTO, TIPOS_EQUIPAMENTO, VOLTAGENS } from '@/lib/constants';
+import { GASES, MARCAS, MODELOS_EQUIPAMENTO, POTENCIAS, STATUS_EQUIPAMENTO, TIPOS_EQUIPAMENTO, VOLTAGENS } from '@/lib/constants';
 import type { EquipamentoDraft } from '@/lib/drafts';
 import type { StatusEquipamento } from '@/lib/types';
 import { calcularVidaUtil } from '@/lib/format';
+import { formatarTagEquipamento } from '@/lib/format';
 
 interface Props {
   draft: EquipamentoDraft;
@@ -18,8 +19,17 @@ export default function EquipamentoFields({ draft, onChange, modoCompleto = fals
     <div data-ev-id="ev_c84282e5a8" className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3">
       <LojaSelect value={draft.lojaCnpj} onChange={(lojaCnpj) => onChange({ lojaCnpj })} required />
 
-      <Field label="Tag do equipamento" required hint="Padrão: EQ. 01, EQ. 02, EQ. 03…">
-        <Input value={draft.tag} onChange={(e) => onChange({ tag: e.target.value })} placeholder="EQ. 01" />
+      <Field label="Tag do equipamento" required hint="O prefixo EQ é fixo; informe somente o número.">
+        <div className="flex items-center gap-2">
+          <span className="rounded-lg border border-input bg-muted px-3 py-2 text-sm font-semibold text-gray-700">EQ</span>
+          <Input
+            inputMode="numeric"
+            value={draft.tag.replace(/^eq\s*\.?\s*/i, '')}
+            onChange={(e) => onChange({ tag: e.target.value.replace(/\D/g, '') })}
+            onBlur={() => onChange({ tag: formatarTagEquipamento(draft.tag) })}
+            placeholder="01"
+          />
+        </div>
       </Field>
 
       <Field label="Local" required hint="Digite livremente — pode ser alterado se a máquina for substituída" className="md:col-span-2">
@@ -76,7 +86,10 @@ export default function EquipamentoFields({ draft, onChange, modoCompleto = fals
       </Field>
 
       <Field label="Modelo">
-        <Input value={draft.modelo} onChange={(e) => onChange({ modelo: e.target.value })} placeholder="Ex.: Dual Inverter Voice" />
+        <Select value={draft.modelo} onChange={(e) => onChange({ modelo: e.target.value })}>
+          <option value="">Selecione…</option>
+          {MODELOS_EQUIPAMENTO.map((modelo) => <option key={modelo} value={modelo}>{modelo}</option>)}
+        </Select>
       </Field>
 
       {modoCompleto && (

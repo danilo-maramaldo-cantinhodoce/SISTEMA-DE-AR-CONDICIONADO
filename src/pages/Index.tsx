@@ -15,8 +15,8 @@ const TABS: { id: TabId; label: string; icon: typeof AirVent }[] = [
   { id: 'equipamento', label: 'Cadastramento de equipamento', icon: AirVent },
   { id: 'prestador', label: 'Terceirizado / Prestador', icon: Briefcase },
   { id: 'historico', label: 'Histórico', icon: History },
-  { id: 'manutencao', label: 'Manutenções Corretivas', icon: Wrench },
-  { id: 'preventiva', label: 'Manutenções Preventivas', icon: Shield },
+  { id: 'manutencao', label: 'Manutenções Corretiva/Preventivas', icon: Wrench },
+  { id: 'preventiva', label: 'Cronograma de manutenção', icon: Shield },
   { id: 'importacao', label: 'Importação em Lote', icon: FileSpreadsheet },
 ];
 
@@ -103,7 +103,7 @@ export default function Index() {
         {tab === 'prestador' && <CadastroPrestador />}
         {tab === 'historico' && <Historico lojaInicial={lojaFoco} equipamentoInicial={equipFoco} />}
         {tab === 'manutencao' && <ManutencaoCorretiva />}
-        {tab === 'preventiva' && <ManutencaoPreventiva lojaInicial={lojaFoco} />}
+        {tab === 'preventiva' && <ManutencaoPreventiva />}
         {tab === 'importacao' && <ImportacaoDados />}
       </main>
     </div>

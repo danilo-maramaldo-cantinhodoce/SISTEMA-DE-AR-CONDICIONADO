@@ -67,7 +67,9 @@ export default function ManutencaoCard({ manutencao }: {manutencao: Manutencao;}
 					<Button variant="ghost" className="px-2" onClick={iniciarEdicao}>
 						<Pencil size={15} /> Editar
 					</Button>
-					<Button variant="ghost" className="px-2 text-destructive" onClick={() => removeManutencao(manutencao.id)}>
+					<Button variant="ghost" className="px-2 text-destructive" onClick={() => {
+            if (window.confirm(`Confirma a exclusão da manutenção de ${formatData(manutencao.data)}?`)) removeManutencao(manutencao.id);
+          }}>
 						<Trash2 size={15} />
 					</Button>
 				</div>

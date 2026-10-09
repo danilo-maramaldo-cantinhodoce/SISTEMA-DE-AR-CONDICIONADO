@@ -5,20 +5,19 @@ import {
   Download,
   CheckCircle2,
   AlertTriangle,
-  FileText,
   X,
   RefreshCw,
   Table,
   Trash2,
   HelpCircle,
   Check,
-  Building2
 } from 'lucide-react';
 import { Badge, Button, Card, CardHeader, EmptyState } from '@/components/ui';
 import { useAcm } from '@/hooks/use-acm';
-import { LOJAS, lojaNome } from '@/lib/constants';
+import { LOJAS, lojaNome, MODELOS_EQUIPAMENTO, POTENCIAS, TIPOS_EQUIPAMENTO } from '@/lib/constants';
 import type { EquipamentoDraft } from '@/lib/drafts';
-import type { LinhaImportacaoPlanilha, TipoManutencaoItem } from '@/lib/types';
+import type { LinhaImportacaoPlanilha } from '@/lib/types';
+import { formatarTagEquipamento } from '@/lib/format';
 
 interface LinhaImportacao {
   idTemp: string;
@@ -35,7 +34,7 @@ export default function ImportacaoDados() {
   const [linhas, setLinhas] = useState<LinhaImportacao[]>([]);
   const [nomeArquivo, setNomeArquivo] = useState<string>('');
   const [isDragging, setIsDragging] = useState(false);
-  const [importadoSucesso, setImportadoSucesso] = useState<{ equipamentos: number; manutencoes: number } | null>(null);
+  const [importadoSucesso, setImportadoSucesso] = useState<{ equipamentos: number } | null>(null);
 
   const baixarModeloExcel = async () => {
     const XLSX = await import('xlsx');
@@ -55,25 +54,18 @@ export default function ImportacaoDados() {
       'dataInstalacao',
       'dataDesativacao',
       'status',
-      'dataManutencao',
-      'tipoManutencao',
-      'custoManutencao',
-      'notaNumero',
-      'notaTipo',
-      'prestadorNome',
-      'prestadorDocumento',
       'observacoes'
     ];
 
     const exemplo1 = [
       LOJAS[0]?.cnpj || '00000000000000',
       LOJAS[0]?.nome || '',
-      'AC-01',
+      'EQ 01',
       'Atendimento / Caixa',
       'Elgin',
       '18000 BTU',
       'Hi-Wall',
-      'Eco Logic',
+      'Inverter',
       'SN123456789',
       'PAT-9988',
       '220V',
@@ -81,25 +73,18 @@ export default function ImportacaoDados() {
       '2024-01-15',
       '',
       'Em Operação',
-      '2026-09-15',
-      'Preventiva Trimestral',
-      '250,00',
-      '000123',
-      'DANFE',
-      'Prestador Exemplo',
-      '',
       'Equipamento em bom estado'
     ];
 
     const exemplo2 = [
       LOJAS[1]?.cnpj || '11111111111111',
       LOJAS[1]?.nome || '',
-      'AC-02',
+      'EQ 02',
       'Depósito',
       'Midea',
       '36000 BTU',
       'Piso Teto',
-      'Liva',
+      'Convencional',
       'SN987654321',
       'PAT-9989',
       '220V',
@@ -107,18 +92,12 @@ export default function ImportacaoDados() {
       '2023-08-10',
       '',
       'Em Operação',
-      '',
-      '',
-      '',
-      '',
-      '',
-      '',
-      'Manutenção preventiva em dia'
+      'EM BOM ESTADO'
     ];
     const workbook = XLSX.utils.book_new();
     const worksheet = XLSX.utils.aoa_to_sheet([cabecalhos, exemplo1, exemplo2]);
-    XLSX.utils.book_append_sheet(workbook, worksheet, 'Equipamentos e manutencoes');
-    XLSX.writeFile(workbook, 'modelo_importacao_equipamentos_manutencoes.xlsx');
+    XLSX.utils.book_append_sheet(workbook, worksheet, 'Equipamentos');
+    XLSX.writeFile(workbook, 'modelo_importacao_equipamentos.xlsx');
   };
 
   const validarEConverterLinha = (dado: Record<string, unknown>, index: number): LinhaImportacao => {
@@ -136,16 +115,31 @@ export default function ImportacaoDados() {
     const tag = campo('tag', 'tagEquipamento');
     const local = campo('local');
     const marca = campo('marca');
-    const potencia = campo('potencia', 'potência');
+    const potenciaInformada = campo('potencia', 'potência');
+    const potenciaDigits = potenciaInformada.replace(/\D/g, '');
+    const potenciaEmTR = /tr/i.test(potenciaInformada);
+    const potencia = POTENCIAS.find((item) => item.replace(/\D/g, '') === potenciaDigits && /tr/i.test(item) === potenciaEmTR) || '';
+    const tipoInformado = campo('tipoEquipamento', 'tipo');
+    const tipoNormalizado = tipoInformado.toLocaleLowerCase('pt-BR').replace(/[^a-z0-9]/g, '');
+    const tipoEquipamento = TIPOS_EQUIPAMENTO.find((item) => item.toLocaleLowerCase('pt-BR').replace(/[^a-z0-9]/g, '') === tipoNormalizado)
+      || (tipoNormalizado.includes('pisoteto') ? 'Piso Teto' : '')
+      || (tipoNormalizado.includes('hiwall') ? 'Hi Wall' : '')
+      || (tipoNormalizado.includes('cassete') ? 'Cassete' : '')
+      || (tipoNormalizado === 'vrf' ? 'VRF' : '');
+    const modeloInformado = campo('modelo');
+    const modeloNormalizado = modeloInformado.toLocaleLowerCase('pt-BR');
+    const modelo = MODELOS_EQUIPAMENTO.find((item) => item.toLocaleLowerCase('pt-BR') === modeloNormalizado)
+      || (modeloNormalizado.includes('inverter') ? 'Inverter' : '')
+      || (modeloNormalizado.includes('convencional') ? 'Convencional' : '')
+      || (modeloNormalizado.includes('splitao') || modeloNormalizado.includes('splitão') ? 'Splitão' : '');
     const dataDesativacao = dataCampo('dataDesativacao');
-    const tipoManutencao = campo('tipoManutencao') as TipoManutencaoItem | '';
 
     if (!lojaCnpj) erros.push('CNPJ da Loja é obrigatório.');
     if (!tag) erros.push('TAG do equipamento é obrigatória.');
     if (!local) erros.push('Localização é obrigatória.');
-    if (tipoManutencao && !['Preventiva Semestral', 'Preventiva Trimestral', 'Corretiva'].includes(tipoManutencao)) {
-      erros.push('Tipo de manutenção inválido.');
-    }
+    if (potenciaInformada && !potencia) erros.push('Potência inválida. Use uma das opções disponíveis no cadastro.');
+    if (tipoInformado && !tipoEquipamento) erros.push('Tipo de equipamento inválido. Use Piso Teto, Hi Wall, Cassete ou VRF.');
+    if (modeloInformado && !modelo) erros.push('Modelo inválido. Use Inverter, Convencional ou Splitão.');
 
     const statusInformado = campo('status', 'statusEquipamento', 'Em Operação').toLowerCase();
     const status: EquipamentoDraft['status'] =
@@ -155,12 +149,12 @@ export default function ImportacaoDados() {
 
     const draft: EquipamentoDraft = {
       lojaCnpj,
-      tag,
+      tag: tag ? formatarTagEquipamento(tag) : '',
       local,
       marca,
       potencia,
-      tipoEquipamento: campo('tipoEquipamento', 'tipo'),
-      modelo: campo('modelo'),
+      tipoEquipamento,
+      modelo,
       numeroSerie: campo('numeroSerie', 'serie'),
       patrimonio: campo('patrimonio'),
       voltagem: campo('voltagem') || '220V',
@@ -187,13 +181,6 @@ export default function ImportacaoDados() {
       dataInstalacao: draft.dataInstalacao,
       dataDesativacao,
       statusEquipamento: status,
-      dataManutencao: dataCampo('dataManutencao'),
-      tipoManutencao: tipoManutencao || undefined,
-      custoManutencao: campo('custoManutencao'),
-      notaNumero: campo('notaNumero'),
-      notaTipo: campo('notaTipo') as LinhaImportacaoPlanilha['notaTipo'],
-      prestadorNome: campo('prestadorNome'),
-      prestadorDocumento: campo('prestadorDocumento'),
       observacoes: campo('observacoes'),
     };
 
@@ -281,7 +268,7 @@ export default function ImportacaoDados() {
     if (validos.length === 0) return;
 
     const resultado = importarDadosPlanilha(validos.map((item) => item.importacao));
-    setImportadoSucesso({ equipamentos: resultado.countEquipamentos, manutencoes: resultado.countManutencoes });
+    setImportadoSucesso({ equipamentos: resultado.countEquipamentos });
     setLinhas([]);
     setNomeArquivo('');
     if (fileInputRef.current) fileInputRef.current.value = '';
@@ -296,8 +283,8 @@ export default function ImportacaoDados() {
       <Card>
         <CardHeader
           icon={<FileSpreadsheet className="text-emerald-600" size={18} />}
-          title="Importação unificada de dados"
-          subtitle="Cadastre equipamentos e manutenções pela mesma planilha Excel."
+          title="Importação de equipamentos"
+          subtitle="Importe somente cadastros de máquinas por planilha Excel, CSV ou JSON."
           action={
             <Button variant="outline" className="text-xs gap-2 border-emerald-200 text-emerald-800 hover:bg-emerald-50" onClick={() => void baixarModeloExcel()}>
               <Download size={14} /> Baixar modelo Excel
@@ -310,7 +297,7 @@ export default function ImportacaoDados() {
             <div className="flex flex-col gap-1">
               <span className="font-bold text-sm">Instruções para Importação:</span>
               <p>
-                Preencha os dados de manutenção na mesma linha do equipamento. Repita a TAG em novas linhas para registrar outros serviços na máquina. Os campos obrigatórios são <strong>lojaCnpj</strong>, <strong>tag</strong> e <strong>local</strong>; salve como XLSX ou CSV antes de importar.
+                O modelo contém somente os campos do cadastro de equipamentos. Os campos obrigatórios são <strong>lojaCnpj</strong>, <strong>tag</strong> e <strong>local</strong>; informe a tag com o número (ex.: 1 ou EQ 01) e salve como XLSX ou CSV antes de importar.
               </p>
             </div>
           </div>
@@ -325,7 +312,7 @@ export default function ImportacaoDados() {
             <div className="flex flex-col">
               <span className="font-bold text-sm">Importação Concluída com Sucesso!</span>
               <span className="text-xs text-green-700">
-                {importadoSucesso.equipamentos} equipamento(s) e {importadoSucesso.manutencoes} manutenção(ões) foram importados.
+                {importadoSucesso.equipamentos} equipamento(s) foram importados.
               </span>
             </div>
           </div>
@@ -350,7 +337,7 @@ export default function ImportacaoDados() {
             type="file"
             ref={fileInputRef}
             onChange={handleFileChange}
-            accept=".csv, .json, text/plain"
+            accept=".xlsx, .xls, .csv, .json, text/plain"
             className="hidden"
           />
           <div className="flex h-12 w-12 items-center justify-center rounded-full bg-primary/10 text-primary">
@@ -380,8 +367,10 @@ export default function ImportacaoDados() {
                   variant="outline"
                   className="text-xs text-red-600"
                   onClick={() => {
-                    setLinhas([]);
-                    setNomeArquivo('');
+                    if (window.confirm('Confirma a remoção de todas as linhas da pré-visualização?')) {
+                      setLinhas([]);
+                      setNomeArquivo('');
+                    }
                   }}
                 >
                   <RefreshCw size={13} className="mr-1" /> Limpar
@@ -460,7 +449,9 @@ export default function ImportacaoDados() {
                         <Button
                           variant="ghost"
                           className="h-7 w-7 p-0 text-red-600 hover:bg-red-100"
-                          onClick={() => removerLinha(item.idTemp)}
+                          onClick={() => {
+                            if (window.confirm('Confirma a exclusão desta linha da pré-visualização?')) removerLinha(item.idTemp);
+                          }}
                         >
                           <Trash2 size={14} />
                         </Button>

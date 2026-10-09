@@ -1,11 +1,11 @@
 import { useEffect, useState } from 'react';
-import { AirVent, AlertTriangle, Calendar, ChevronRight, ClipboardList, DollarSign, History, Pencil, Plus, Save, Shield, Wrench, X } from 'lucide-react';
+import { AirVent, AlertTriangle, ChevronRight, ClipboardList, DollarSign, History, Pencil, Save, Shield, Wrench, X } from 'lucide-react';
 import { Badge, Button, Card, CardHeader, EmptyState } from '@/components/ui';
 import { statusTone } from '@/lib/ui-helpers';
 import LojaSelect from '@/components/LojaSelect';
 import EquipamentoFields from '@/components/EquipamentoFields';
 import ManutencaoForm from '@/components/ManutencaoForm';
-import { cronogramaPreventiva, ehPreventiva, manutencaoVazia, preventivaAtrasada, totalIndividualManutencao, type EquipamentoDraft, type ManutencaoDraft } from '@/lib/drafts';
+import { cronogramaPreventiva, ehPreventiva, manutencaoVazia, totalIndividualManutencao, type EquipamentoDraft, type ManutencaoDraft } from '@/lib/drafts';
 import ManutencaoCard from '@/components/ManutencaoCard';
 import { useAcm } from '@/hooks/use-acm';
 import { formatBRL, formatData, formatDataHora, toNumber } from '@/lib/format';
@@ -21,9 +21,9 @@ const Info = ({ label, value }: { label: string; value: string }) => (
 
 export default function Historico({ lojaInicial, equipamentoInicial }: { lojaInicial?: string; equipamentoInicial?: string }) {
   const {
-    equipamentos, equipamentosDaLoja, manutencoesDoEquipamento, eventosDoEquipamento,
+    equipamentos, equipamentosDaLoja, manutencoesDoEquipamento, manutencoesDaLoja, eventosDoEquipamento,
     updateEquipamento, removeEquipamento, addManutencao, addManutencaoEmLote,
-    custoTotalPreventiva, custoTotalCorretiva, contarManutencoes
+    custoTotalCorretiva, contarManutencoes
   } = useAcm();
   const [loja, setLoja] = useState(lojaInicial ?? '');
   const [selecionado, setSelecionado] = useState(equipamentoInicial ?? '');
@@ -51,16 +51,10 @@ export default function Historico({ lojaInicial, equipamentoInicial }: { lojaIni
     .filter((m) => !ehPreventiva(String(m.tipo)))
     .reduce((acc, m) => acc + custoDaManutencao(m), 0);
 
-  const custoPreventivas = manutencoes
-    .filter((m) => ehPreventiva(String(m.tipo)))
-    .reduce((acc, m) => acc + custoDaManutencao(m), 0);
-
-  const custoTotal = custoCorretivas + custoPreventivas;
-
-  // Projeção de preventiva
-  const cronograma = equipamento ? cronogramaPreventiva(manutencoes) : null;
-  const proximaPrev = cronograma?.dataProxima ?? null;
-  const atrasada = equipamento ? preventivaAtrasada(manutencoes) : false;
+  const cronogramaLoja = loja
+    ? cronogramaPreventiva(manutencoesDaLoja(loja).filter((m) => ehPreventiva(String(m.tipo))))
+    : null;
+  const corretivasEquipamento = manutencoes.filter((m) => !ehPreventiva(String(m.tipo)));
 
   const abrirEdicao = () => {
     if (!equipamento) return;
@@ -107,16 +101,11 @@ export default function Historico({ lojaInicial, equipamentoInicial }: { lojaIni
           <CardHeader title={`Equipamentos · ${lojaNome(loja)}`} subtitle={loja} />
           <div data-ev-id="ev_35cca66194" className="flex flex-col gap-4 p-5">
             {/* Contadores da loja */}
-            <div data-ev-id="ev_0e8c8ee8ea" className="grid grid-cols-2 gap-3 md:grid-cols-5">
+            <div data-ev-id="ev_0e8c8ee8ea" className="grid grid-cols-2 gap-3 md:grid-cols-4">
               <div data-ev-id="ev_d4d056e2b4" className="flex flex-col items-center rounded-lg bg-blue-50 px-4 py-3">
                 <AirVent size={20} className="text-blue-600 mb-1" />
                 <span data-ev-id="ev_20838c0241" className="text-lg font-bold text-blue-900">{lista.length}</span>
                 <span data-ev-id="ev_16fbed0b83" className="text-xs text-blue-700">Equipamentos</span>
-              </div>
-              <div data-ev-id="ev_8ba47f33d4" className="flex flex-col items-center rounded-lg bg-green-50 px-4 py-3">
-                <DollarSign size={20} className="text-green-600 mb-1" />
-                <span data-ev-id="ev_99f19f6c3d" className="text-lg font-bold text-purple-900">{formatBRL(custoTotalPreventiva(loja))}</span>
-                <span data-ev-id="ev_e13530eafa" className="text-xs text-purple-700">Custo preventiva</span>
               </div>
               <div data-ev-id="ev_60f953b529" className="flex flex-col items-center rounded-lg bg-amber-50 px-4 py-3">
                 <Wrench size={20} className="text-amber-600 mb-1" />
@@ -128,10 +117,10 @@ export default function Historico({ lojaInicial, equipamentoInicial }: { lojaIni
                 <span data-ev-id="ev_51f9cd3e9a" className="text-lg font-bold text-amber-900">{contarManutencoes(loja, 'corretiva')}</span>
                 <span data-ev-id="ev_20f24d259e" className="text-xs text-amber-700">Corretivas</span>
               </div>
-              <div data-ev-id="ev_aa437d9266" className="flex flex-col items-center rounded-lg bg-purple-50 px-4 py-3">
-                <Shield size={20} className="text-purple-600 mb-1" />
-                <span data-ev-id="ev_5feb036f7f" className="text-lg font-bold text-purple-900">{contarManutencoes(loja, 'preventiva')}</span>
-                <span data-ev-id="ev_2c23eea577" className="text-xs text-purple-700">Preventivas</span>
+              <div className="flex flex-col items-center rounded-lg bg-blue-50 px-4 py-3 text-center">
+                <span className="mb-1 text-xs font-semibold text-blue-700">Última preventiva</span>
+                <span className="text-sm font-bold text-blue-900">{cronogramaLoja ? formatData(cronogramaLoja.ultima.data) : '—'}</span>
+                <span className="text-xs text-blue-700">{cronogramaLoja ? String(cronogramaLoja.ultima.tipo).replace(/^preventiva\s*/i, '').toLocaleUpperCase('pt-BR') : 'Sem registro'}</span>
               </div>
             </div>
 
@@ -142,12 +131,8 @@ export default function Historico({ lojaInicial, equipamentoInicial }: { lojaIni
                 lista.map((eq) => {
                   const ativo = eq.id === selecionado;
                   const manutencoesEquipamento = manutencoesDoEquipamento(eq.id);
-                  const custoPreventiva = manutencoesEquipamento
-                    .filter((m) => String(m.tipo).toLowerCase().includes('preventiva'))
-                    .reduce((total, m) => total + custoDaManutencao(m), 0);
-                  const custoCorretiva = manutencoesEquipamento
-                    .filter((m) => !String(m.tipo).toLowerCase().includes('preventiva'))
-                    .reduce((total, m) => total + custoDaManutencao(m), 0);
+                  const corretivas = manutencoesEquipamento.filter((m) => !ehPreventiva(String(m.tipo)));
+                  const custoCorretiva = corretivas.reduce((total, m) => total + custoDaManutencao(m), 0);
                   return (
                     <button
                       data-ev-id="ev_2affce2907"
@@ -180,8 +165,7 @@ export default function Historico({ lojaInicial, equipamentoInicial }: { lojaIni
                         </div>
                       </div>
                       <div data-ev-id="ev_f54356eb4e" className="flex flex-row items-center gap-2">
-                        <Badge tone="purple">Prev. {formatBRL(custoPreventiva)}</Badge>
-                        <Badge tone="amber">Corr. {formatBRL(custoCorretiva)}</Badge>
+                        <Badge tone="amber">Corr. {formatBRL(custoCorretiva)} · {corretivas.length}</Badge>
                         <Badge tone={eq.status === 'Desativada' ? 'red' : statusTone(eq.status)}>{eq.status}</Badge>
                         <ChevronRight size={16} className={`text-muted-foreground transition ${ativo ? 'rotate-90' : ''}`} />
                       </div>
@@ -210,29 +194,12 @@ export default function Historico({ lojaInicial, equipamentoInicial }: { lojaIni
                 <Button variant="outline" onClick={() => { setTipoNova('corretiva'); setNovaManutencao({ ...manutencaoVazia(equipamento.id, 'corretiva'), lojaCnpj: equipamento.lojaCnpj, equipamentoIds: [equipamento.id] }); }}>
                   <Wrench size={15} /> Corretiva
                 </Button>
-                <Button variant="outline" onClick={() => { setTipoNova('preventiva'); setNovaManutencao({ ...manutencaoVazia(equipamento.id, 'preventiva'), lojaCnpj: equipamento.lojaCnpj, equipamentoIds: [equipamento.id] }); }}>
-                  <Shield size={15} /> Preventiva
-                </Button>
               </div>
             }
           />
 
           <div data-ev-id="ev_9254e90f8b" className="flex flex-col gap-6 p-5">
             {/* Projeção de preventiva */}
-            {proximaPrev && (
-              <div data-ev-id="ev_57208e881f" className={`flex flex-row items-center gap-3 rounded-lg px-4 py-3 ${atrasada ? 'bg-red-50 border border-red-200' : 'bg-purple-50 border border-purple-200'}`}>
-                <Calendar size={20} className={atrasada ? 'text-red-600' : 'text-purple-600'} />
-                <div data-ev-id="ev_59b1de12e9" className="flex flex-col gap-0.5">
-                  <span data-ev-id="ev_a13dc6c40c" className={`text-sm font-bold ${atrasada ? 'text-red-900' : 'text-purple-900'}`}>
-                    {atrasada ? 'Preventiva atrasada!' : 'Próxima preventiva'}
-                  </span>
-                  <span data-ev-id="ev_c37b39d9a1" className={`text-xs ${atrasada ? 'text-red-700' : 'text-purple-700'}`}>
-                    Data prevista: {formatData(proximaPrev.toISOString())} · {cronograma?.tipoProxima}
-                  </span>
-                </div>
-              </div>
-            )}
-
             {editando && draft ? (
               <div data-ev-id="ev_bf6d2d8c83" className="flex flex-col gap-4 rounded-xl border-2 border-primary/40 p-4">
                 <Badge tone="purple">
@@ -265,18 +232,10 @@ export default function Historico({ lojaInicial, equipamentoInicial }: { lojaIni
                 {equipamento.dataDesativacao && <Info label="Data de desativação" value={formatData(equipamento.dataDesativacao)} />}
                 {equipamento.vidaUtil && <Info label="Vida útil" value={equipamento.vidaUtil} />}
 
-                {/* Divisão de Custos de Preventiva, Corretiva e Total Acumulado */}
+                {/* Custos e quantidade de corretivas deste equipamento */}
                 <div className="flex flex-col gap-0.5 rounded-lg bg-amber-50/70 p-2.5 border border-amber-100">
-                  <span className="text-xs font-semibold uppercase tracking-wide text-amber-800">Custo Corretivas</span>
+                  <span className="text-xs font-semibold uppercase tracking-wide text-amber-800">Custo corretivas · {corretivasEquipamento.length} serviço(s)</span>
                   <span className="text-sm font-bold text-amber-900">{formatBRL(custoCorretivas)}</span>
-                </div>
-                <div className="flex flex-col gap-0.5 rounded-lg bg-purple-50/70 p-2.5 border border-purple-100">
-                  <span className="text-xs font-semibold uppercase tracking-wide text-purple-800">Custo Preventivas</span>
-                  <span className="text-sm font-bold text-purple-900">{formatBRL(custoPreventivas)}</span>
-                </div>
-                <div className="flex flex-col gap-0.5 rounded-lg bg-green-50/70 p-2.5 border border-green-100">
-                  <span className="text-xs font-semibold uppercase tracking-wide text-green-800">Custo Acumulado Total</span>
-                  <span className="text-sm font-bold text-green-900">{formatBRL(custoTotal)}</span>
                 </div>
 
                 <Info label="Cadastrado em" value={formatDataHora(equipamento.criadoEm)} />
@@ -322,25 +281,12 @@ export default function Historico({ lojaInicial, equipamentoInicial }: { lojaIni
             {/* Manutenções separadas por tipo */}
             <div data-ev-id="ev_aa0528515b" className="flex flex-col gap-3">
               <h3 data-ev-id="ev_3b70aa4837" className="text-sm font-bold text-gray-900 flex items-center gap-2">
-                <Wrench size={16} className="text-amber-600" /> Manutenções Corretivas ({manutencoes.filter((m) => !ehPreventiva(String(m.tipo))).length})
+                <Wrench size={16} className="text-amber-600" /> Manutenções corretivas ({corretivasEquipamento.length})
               </h3>
-              {manutencoes.filter((m) => !ehPreventiva(String(m.tipo))).length === 0 ? (
+              {corretivasEquipamento.length === 0 ? (
                 <p data-ev-id="ev_2fdfe08be5" className="text-sm text-muted-foreground italic">Nenhuma manutenção corretiva registrada.</p>
               ) : (
-                manutencoes
-                  .filter((m) => !ehPreventiva(String(m.tipo)))
-                  .map((m) => <ManutencaoCard key={m.id} manutencao={{ ...m, tipo: m.tipo || 'corretiva' }} />)
-              )}
-            </div>
-
-            <div data-ev-id="ev_ef354460a1" className="flex flex-col gap-3">
-              <h3 data-ev-id="ev_36311bef0a" className="text-sm font-bold text-gray-900 flex items-center gap-2">
-                <Shield size={16} className="text-purple-600" /> Manutenções Preventivas ({manutencoes.filter((m) => ehPreventiva(String(m.tipo))).length})
-              </h3>
-              {manutencoes.filter((m) => ehPreventiva(String(m.tipo))).length === 0 ? (
-                <p data-ev-id="ev_28010b4e2c" className="text-sm text-muted-foreground italic">Nenhuma manutenção preventiva registrada.</p>
-              ) : (
-                manutencoes.filter((m) => ehPreventiva(String(m.tipo))).map((m) => <ManutencaoCard key={m.id} manutencao={m} />)
+                corretivasEquipamento.map((m) => <ManutencaoCard key={m.id} manutencao={{ ...m, tipo: m.tipo || 'corretiva' }} />)
               )}
             </div>
 

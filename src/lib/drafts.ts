@@ -73,13 +73,13 @@ export const cronogramaPreventiva = (manutencoes: Manutencao[]) => {
 	const tipoProxima = ultimaSemestral ? 'Preventiva Trimestral' : 'Preventiva Semestral';
 	const dia = dataProxima.getDate();
 	dataProxima.setDate(1);
-	dataProxima.setMonth(dataProxima.getMonth() + (ultimaSemestral ? 3 : 6));
+	dataProxima.setMonth(dataProxima.getMonth() + 3);
 	const ultimoDiaMes = new Date(dataProxima.getFullYear(), dataProxima.getMonth() + 1, 0).getDate();
 	dataProxima.setDate(Math.min(dia, ultimoDiaMes));
 	return { ultima, tipoProxima, dataProxima };
 };
 
-/** Calcula a próxima preventiva alternando os ciclos semestral e trimestral. */
+/** Alterna o tipo registrado a cada preventiva, realizada em ciclos de três meses. */
 export const proximaPreventiva = (manutencoes: Manutencao[]): Date | null => {
 	return cronogramaPreventiva(manutencoes)?.dataProxima ?? null;
 };

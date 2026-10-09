@@ -23,9 +23,11 @@ export const LOJAS: Loja[] = [
 
 export const MARCAS: string[] = ['Carrier', 'Daikin', 'Elgin', 'Fujitsu', 'Gree', 'LG', 'Philco', 'Samsung', 'Springer Midea'];
 
-export const POTENCIAS: string[] = ['9000 BTUs', '12000 BTUs', '18000 BTUs', '24000 BTUs', '36000 BTUs', '60000 BTUs', '80000 BTUs'];
+export const POTENCIAS: string[] = ['9000 BTUs', '12000 BTUs', '18000 BTUs', '24000 BTUs', '36000 BTUs', '60000 BTUs', '80000 BTUs', '90000 BTUs', '24 TR'];
 
-export const TIPOS_EQUIPAMENTO: string[] = ['Split Hi-Wall', 'Split Cassete', 'Split Piso-Teto', 'Multi Split', 'Janela / ACJ', 'Self Contained', 'VRF'];
+export const TIPOS_EQUIPAMENTO: string[] = ['Piso Teto', 'Hi Wall', 'Cassete', 'VRF'];
+
+export const MODELOS_EQUIPAMENTO: string[] = ['Inverter', 'Convencional', 'Splitão'];
 
 export const VOLTAGENS: string[] = ['110V', '220V', '380V (Trifásico)'];
 

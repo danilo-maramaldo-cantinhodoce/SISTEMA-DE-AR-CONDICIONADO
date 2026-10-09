@@ -33,11 +33,23 @@ export function Field({ label, hint, required, children, className = '' }: {labe
 }
 
 const base =
-'w-full rounded-lg border border-input bg-white px-3 py-2 text-sm text-gray-900 outline-none transition focus:border-primary focus:ring-2 focus:ring-ring/30 disabled:bg-muted disabled:text-muted-foreground';
+'w-full rounded-lg border border-input bg-white px-3 py-2 text-sm text-gray-900 uppercase outline-none transition focus:border-primary focus:ring-2 focus:ring-ring/30 disabled:bg-muted disabled:text-muted-foreground';
 
 export function Input(props: InputHTMLAttributes<HTMLInputElement>) {
-  const { className = '', ...rest } = props;
-  return <input data-ev-id="ev_c25ef46c99" {...rest} className={`${base} ${className}`} />;
+  const { className = '', onChange, type, ...rest } = props;
+  const upperCaseText = !['email', 'password', 'date', 'datetime-local', 'month', 'time', 'number', 'file', 'checkbox', 'radio'].includes(type ?? 'text');
+  return (
+    <input
+      data-ev-id="ev_c25ef46c99"
+      {...rest}
+      type={type}
+      onChange={(event) => {
+        if (upperCaseText) event.currentTarget.value = event.currentTarget.value.toLocaleUpperCase('pt-BR');
+        onChange?.(event);
+      }}
+      className={`${base} ${type === 'email' || type === 'password' ? 'normal-case' : ''} ${className}`}
+    />
+  );
 }
 
 export function Select(props: SelectHTMLAttributes<HTMLSelectElement>) {
@@ -46,8 +58,18 @@ export function Select(props: SelectHTMLAttributes<HTMLSelectElement>) {
 }
 
 export function TextArea(props: TextareaHTMLAttributes<HTMLTextAreaElement>) {
-  const { className = '', ...rest } = props;
-  return <textarea data-ev-id="ev_1783783a77" {...rest} className={`${base} min-h-24 resize-y ${className}`} />;
+  const { className = '', onChange, ...rest } = props;
+  return (
+    <textarea
+      data-ev-id="ev_1783783a77"
+      {...rest}
+      onChange={(event) => {
+        event.currentTarget.value = event.currentTarget.value.toLocaleUpperCase('pt-BR');
+        onChange?.(event);
+      }}
+      className={`${base} min-h-24 resize-y ${className}`}
+    />
+  );
 }
 
 type ButtonProps = ButtonHTMLAttributes<HTMLButtonElement> & {variant?: 'primary' | 'outline' | 'ghost' | 'danger';};

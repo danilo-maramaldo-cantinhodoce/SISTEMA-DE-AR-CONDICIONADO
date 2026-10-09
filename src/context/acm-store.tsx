@@ -1,8 +1,8 @@
 import { useCallback, useEffect, useMemo, useState, type ReactNode } from 'react';
 import { AcmContext, emptyState, STORAGE_KEY, type Persisted, type StoreValue } from '@/context/acm-context';
 import type { Equipamento, Manutencao, Prestador, TipoEvento, TipoManutencao, NotaFiscalLote, LinhaImportacaoPlanilha } from '@/lib/types';
-import { LOJAS } from '@/lib/constants';
-import { calcularVidaUtil, novoId, toNumber } from '@/lib/format';
+import { LOJAS, TIPOS_EQUIPAMENTO } from '@/lib/constants';
+import { calcularVidaUtil, formatarTagEquipamento, novoId, toNumber } from '@/lib/format';
 import { supabase, supabaseConfigured } from '@/lib/supabase';
 import SupabaseAuth from '@/components/SupabaseAuth';
 
@@ -34,6 +34,7 @@ function load(): Persisted {
         const migrated: Persisted = {
           equipamentos: (oldData.equipamentos ?? []).map(e => ({
             ...e,
+            tag: e.tag ? formatarTagEquipamento(e.tag) : '',
             status: e.dataDesativacao || String(e.status) === 'Desativado' ? 'Desativada' : (String(e.status) === 'Em operação' ? 'Em Operação' : e.status || 'Em Operação')
           })),
           prestadores: oldData.prestadores ?? [],
@@ -50,6 +51,7 @@ function load(): Persisted {
     return {
       equipamentos: (parsed.equipamentos ?? []).map(e => ({
         ...e,
+        tag: e.tag ? formatarTagEquipamento(e.tag) : '',
         status: e.dataDesativacao || String(e.status) === 'Desativado' || e.status === 'Desativada' ? 'Desativada' : 'Em Operação'
       })),
       prestadores: parsed.prestadores ?? [],
@@ -80,7 +82,10 @@ export function AcmStoreProvider({ children }: { children: ReactNode }) {
     if (data?.payload) {
       const remoto = data.payload as Partial<Persisted>;
       setState({
-        equipamentos: remoto.equipamentos ?? [],
+        equipamentos: (remoto.equipamentos ?? []).map((equipamento) => ({
+          ...equipamento,
+          tag: equipamento.tag ? formatarTagEquipamento(equipamento.tag) : '',
+        })),
         prestadores: remoto.prestadores ?? [],
         manutencoes: remoto.manutencoes ?? [],
         eventos: remoto.eventos ?? [],
@@ -172,6 +177,11 @@ export function AcmStoreProvider({ children }: { children: ReactNode }) {
       const agora = new Date().toISOString();
       const novo: Equipamento = {
         ...data,
+        tag: formatarTagEquipamento(data.tag),
+        local: data.local.toLocaleUpperCase('pt-BR'),
+        numeroSerie: data.numeroSerie.toLocaleUpperCase('pt-BR'),
+        patrimonio: data.patrimonio.toLocaleUpperCase('pt-BR'),
+        observacoes: data.observacoes.toLocaleUpperCase('pt-BR'),
         status: data.dataDesativacao ? 'Desativada' : data.status,
         id: novoId(),
         criadoEm: agora,
@@ -190,7 +200,16 @@ export function AcmStoreProvider({ children }: { children: ReactNode }) {
         ...prev,
         equipamentos: prev.equipamentos.map((e) => {
           if (e.id !== id) return e;
-          const atualizado = { ...e, ...data, atualizadoEm: new Date().toISOString() };
+          const atualizado = {
+            ...e,
+            ...data,
+            tag: data.tag ? formatarTagEquipamento(data.tag) : e.tag,
+            local: (data.local ?? e.local).toLocaleUpperCase('pt-BR'),
+            numeroSerie: (data.numeroSerie ?? e.numeroSerie).toLocaleUpperCase('pt-BR'),
+            patrimonio: (data.patrimonio ?? e.patrimonio).toLocaleUpperCase('pt-BR'),
+            observacoes: (data.observacoes ?? e.observacoes).toLocaleUpperCase('pt-BR'),
+            atualizadoEm: new Date().toISOString(),
+          };
           if (Object.prototype.hasOwnProperty.call(data, 'dataDesativacao')) {
             atualizado.status = data.dataDesativacao ? 'Desativada' : (data.status || 'Em Operação');
           }
@@ -228,10 +247,24 @@ export function AcmStoreProvider({ children }: { children: ReactNode }) {
   const addManutencao: StoreValue['addManutencao'] = useCallback(
     (data) => {
       const agora = new Date().toISOString();
-      const nova: Manutencao = { ...data, id: novoId(), criadoEm: agora, atualizadoEm: agora };
+      const normalizada = {
+        ...data,
+        problemaAtestado: data.problemaAtestado.toLocaleUpperCase('pt-BR'),
+        solucao: data.solucao.toLocaleUpperCase('pt-BR'),
+        observacoes: data.observacoes.toLocaleUpperCase('pt-BR'),
+        numeroNota: data.numeroNota?.toLocaleUpperCase('pt-BR'),
+        servicos: (data.servicos ?? []).map((servico) => ({
+          ...servico,
+          descricao: servico.descricao.toLocaleUpperCase('pt-BR'),
+          notaNumero: servico.notaNumero.toLocaleUpperCase('pt-BR'),
+        })),
+      };
+      const nova: Manutencao = { ...normalizada, id: novoId(), criadoEm: agora, atualizadoEm: agora };
       setState((prev) => ({ ...prev, manutencoes: [nova, ...prev.manutencoes] }));
       const isPrev = isTipoPreventiva(data.tipo);
-      log(nova.equipamentoId, isPrev ? 'preventiva' : 'manutencao', `Manutenção ${data.tipo} registrada`, data.problemaAtestado || data.solucao || '');
+      if (nova.equipamentoId) {
+        log(nova.equipamentoId, isPrev ? 'preventiva' : 'manutencao', `Manutenção ${data.tipo} registrada`, data.problemaAtestado || data.solucao || '');
+      }
       return nova;
     },
     [log],
@@ -317,7 +350,17 @@ export function AcmStoreProvider({ children }: { children: ReactNode }) {
         const manutencoes = prev.manutencoes.map((m) => {
           if (m.id !== id) return m;
           equipamentoId = m.equipamentoId;
-          return { ...m, ...data, atualizadoEm: new Date().toISOString() };
+          const atualizado = { ...m, ...data, atualizadoEm: new Date().toISOString() };
+          atualizado.problemaAtestado = atualizado.problemaAtestado.toLocaleUpperCase('pt-BR');
+          atualizado.solucao = atualizado.solucao.toLocaleUpperCase('pt-BR');
+          atualizado.observacoes = atualizado.observacoes.toLocaleUpperCase('pt-BR');
+          atualizado.numeroNota = atualizado.numeroNota?.toLocaleUpperCase('pt-BR');
+          atualizado.servicos = (atualizado.servicos ?? []).map((servico) => ({
+            ...servico,
+            descricao: servico.descricao.toLocaleUpperCase('pt-BR'),
+            notaNumero: servico.notaNumero.toLocaleUpperCase('pt-BR'),
+          }));
+          return atualizado;
         });
         return { ...prev, manutencoes };
       });
@@ -336,14 +379,11 @@ export function AcmStoreProvider({ children }: { children: ReactNode }) {
   const importarDadosPlanilha: StoreValue['importarDadosPlanilha'] = useCallback(
     (linhas: LinhaImportacaoPlanilha[]) => {
       let countEquipamentos = 0;
-      let countManutencoes = 0;
+      const countManutencoes = 0;
       const agora = new Date().toISOString();
 
       setState((prev) => {
         const novosEquipamentos = [...prev.equipamentos];
-        const novasManutencoes = [...prev.manutencoes];
-        const novosPrestadores = [...prev.prestadores];
-
         linhas.forEach((linha) => {
           if (!linha.tagEquipamento) return;
 
@@ -363,21 +403,21 @@ export function AcmStoreProvider({ children }: { children: ReactNode }) {
             eq = {
               id: novoId(),
               lojaCnpj: lojaCnpj || LOJAS[0].cnpj,
-              tag: linha.tagEquipamento,
-              local: linha.local || '',
+              tag: formatarTagEquipamento(linha.tagEquipamento),
+              local: (linha.local || '').toLocaleUpperCase('pt-BR'),
               marca: linha.marca || 'Outra',
               potencia: linha.potencia || '',
-              tipoEquipamento: linha.tipoEquipamento || 'Split Hi-Wall',
+              tipoEquipamento: linha.tipoEquipamento || TIPOS_EQUIPAMENTO[1],
               modelo: linha.modelo || '',
-              numeroSerie: linha.numeroSerie || '',
+              numeroSerie: (linha.numeroSerie || '').toLocaleUpperCase('pt-BR'),
               voltagem: linha.voltagem || '220V',
               gasRefrigerante: linha.gasRefrigerante || 'R-410A',
               dataInstalacao: linha.dataInstalacao || new Date().toISOString().substring(0, 10),
               dataDesativacao: linha.dataDesativacao || '',
               vidaUtil: linha.vidaUtil || calcularVidaUtil(linha.dataInstalacao || '', linha.dataDesativacao || ''),
-              patrimonio: linha.patrimonio || '',
+              patrimonio: (linha.patrimonio || '').toLocaleUpperCase('pt-BR'),
               status: linha.dataDesativacao || linha.statusEquipamento === 'Desativada' ? 'Desativada' : 'Em Operação',
-              observacoes: linha.observacoes || 'Importado via planilha',
+              observacoes: (linha.observacoes || 'Importado via planilha').toLocaleUpperCase('pt-BR'),
               criadoEm: agora,
               atualizadoEm: agora,
             };
@@ -391,66 +431,11 @@ export function AcmStoreProvider({ children }: { children: ReactNode }) {
             if (linha.statusEquipamento) eq.status = linha.statusEquipamento;
           }
 
-          // Verifica se há manutenção na linha
-          if (linha.tipoManutencao || linha.custoManutencao || linha.notaNumero) {
-            let prestadorId = '';
-            if (linha.prestadorNome) {
-              let p = novosPrestadores.find((pr) => pr.nome.toLowerCase() === linha.prestadorNome?.toLowerCase());
-              if (!p) {
-                p = {
-                  id: novoId(),
-                  nome: linha.prestadorNome,
-                  razaoSocial: linha.prestadorNome,
-                  documento: linha.prestadorDocumento || '',
-                  tipoDocumento: 'CNPJ',
-                  contato: '',
-                  email: '',
-                  observacoes: 'Cadastrado na importação',
-                  criadoEm: agora,
-                };
-                novosPrestadores.push(p);
-              }
-              prestadorId = p.id;
-            }
-
-            const custoVal = toNumber(linha.custoManutencao);
-            const man: Manutencao = {
-              id: novoId(),
-              equipamentoId: eq.id,
-              tipo: linha.tipoManutencao || 'Corretiva',
-              data: linha.dataManutencao || new Date().toISOString().substring(0, 10),
-              problemaAtestado: linha.observacoes || `Importado via planilha`,
-              solucao: 'Concluído',
-              status: 'Concluída',
-              custo: custoVal,
-              servicos: linha.notaNumero
-                ? [
-                    {
-                      id: novoId(),
-                      prestadorId,
-                      descricao: `Importação NF ${linha.notaNumero}`,
-                      notaNumero: linha.notaNumero,
-                      notaTipo: linha.notaTipo || 'DANFE',
-                      notaValor: String(custoVal),
-                      notaData: linha.dataManutencao || new Date().toISOString().substring(0, 10),
-                      valorIndividual: String(custoVal),
-                    },
-                  ]
-                : [],
-              observacoes: linha.observacoes || '',
-              criadoEm: agora,
-              atualizadoEm: agora,
-            };
-            novasManutencoes.push(man);
-            countManutencoes++;
-          }
         });
 
         return {
           ...prev,
           equipamentos: novosEquipamentos,
-          prestadores: novosPrestadores,
-          manutencoes: novasManutencoes,
         };
       });
 
@@ -468,7 +453,7 @@ export function AcmStoreProvider({ children }: { children: ReactNode }) {
     
     const manutencoesDaLoja = (cnpj: string) => {
       const eqIds = new Set(equipamentosDaLoja(cnpj).map((e) => e.id));
-      return (state.manutencoes ?? []).filter((m) => eqIds.has(m.equipamentoId));
+      return (state.manutencoes ?? []).filter((m) => m.lojaCnpj === cnpj || eqIds.has(m.equipamentoId));
     };
     
     const custoEquipamento = (equipamentoId: string) => {
