@@ -141,3 +141,19 @@ na aba de importação de dados, coloca somente o cadatros das máuqinas mesmo, 
 
 me ajuda a configurar/conectar o supabase para receber esses dados
 
+
+
+
+
+
+
+
+
+
+
+
+ALTERAÇÕES ACIMA FORAM realizadas
+
+ALTERAÇÕES NOVAS
+AUMENTAR TAMANHO DA LISTA COM AS ABAS
+ADITAR QUALQUER CADASTRO FEITO
